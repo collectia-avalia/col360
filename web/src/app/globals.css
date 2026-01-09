@@ -1,0 +1,32 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  
+  /* Avalia Brand Colors */
+  --color-avalia-petrol: #0F172A; /* Azul Negro Petrolizado (Base Slate-900 mejorada) */
+  --color-avalia-blue: #2563EB;   /* Azul Corporativo (Blue-600) */
+  --color-avalia-violet: #7C3AED; /* Violeta Vibrante (Violet-600) */
+  --color-avalia-light: #F0F4F8;  /* Fondo Claro */
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
