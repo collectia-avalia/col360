@@ -26,13 +26,23 @@ export function PayersList({ payers }: { payers: Payer[] }) {
     .filter(p => p.risk_status === 'aprobado')
     .reduce((sum, p) => sum + (p.approved_quota || 0), 0)
 
+  // Helper para calcular estado visual (Misma lógica que en Facturas)
+  const getVisualStatus = (invoice: any) => {
+    if (invoice.status === 'pagada') return 'pagada'
+    const today = new Date()
+    const todayStr = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0')
+    return invoice.due_date < todayStr ? 'vencida' : 'vigente'
+  }
+
   // Procesar datos para la tabla
   const processedPayers = payers.map(payer => {
-    const activeInvoices = payer.invoices?.filter((inv: any) => inv.status === 'vigente') || []
-    const overdueInvoices = payer.invoices?.filter((inv: any) => inv.status === 'vencida') || []
+    // Usar estado visual para clasificación
+    const activeInvoices = payer.invoices?.filter((inv: any) => getVisualStatus(inv) === 'vigente') || []
+    const overdueInvoices = payer.invoices?.filter((inv: any) => getVisualStatus(inv) === 'vencida') || []
     
     const activeValue = activeInvoices.reduce((sum: number, inv: any) => sum + (inv.amount || 0), 0)
     const overdueValue = overdueInvoices.reduce((sum: number, inv: any) => sum + (inv.amount || 0), 0)
+    const consumedQuota = activeValue + overdueValue // Total consumido (Vigente + Vencido)
     const invoiceCount = (payer.invoices?.length || 0)
 
     return {
@@ -40,7 +50,8 @@ export function PayersList({ payers }: { payers: Payer[] }) {
       stats: {
         invoiceCount,
         activeValue,
-        overdueValue
+        overdueValue,
+        consumedQuota
       }
     }
   })
@@ -175,6 +186,12 @@ export function PayersList({ payers }: { payers: Payer[] }) {
                 Estado Riesgo
               </th>
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Cupo Aprobado
+              </th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Consumido
+              </th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 # Facturas
               </th>
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -206,6 +223,19 @@ export function PayersList({ payers }: { payers: Payer[] }) {
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <StatusBadge status={payer.risk_status} />
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  {formatCurrency(payer.approved_quota || 0)}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                   <div className="flex flex-col">
+                      <span>{formatCurrency(payer.stats.consumedQuota)}</span>
+                      <span className="text-xs text-gray-500">
+                        {payer.approved_quota > 0 
+                            ? `${Math.round((payer.stats.consumedQuota / payer.approved_quota) * 100)}% uso` 
+                            : '0%'}
+                      </span>
+                   </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-center">
                   {payer.stats.invoiceCount}

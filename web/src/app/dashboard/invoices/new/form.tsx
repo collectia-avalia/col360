@@ -50,6 +50,12 @@ export default function NewInvoiceForm({ payers }: { payers: PayerOption[] }) {
 
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [showFields, setShowFields] = useState(false)
+  const [isPdf, setIsPdf] = useState(false)
+
+  const normalizeNit = (nit: string | null | undefined) => {
+    if (!nit) return ''
+    return nit.replace(/[^0-9]/g, '')
+  }
   
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -57,11 +63,21 @@ export default function NewInvoiceForm({ payers }: { payers: PayerOption[] }) {
 
     setFileName(file.name)
     setIsAnalyzing(true)
+    setParsedData(null)
+    setSelectedPayerId('')
+    setIsPdf(false)
     
     // Simular tiempo de análisis (UX "Mágica")
     await new Promise(resolve => setTimeout(resolve, 1500))
 
-    if (file.name.endsWith('.xml')) {
+    if (file.name.toLowerCase().endsWith('.pdf')) {
+        setIsPdf(true)
+        setIsAnalyzing(false)
+        setShowFields(true)
+        return
+    }
+
+    if (file.name.toLowerCase().endsWith('.xml')) {
       try {
         const text = await file.text()
         const parser = new DOMParser()
@@ -90,22 +106,39 @@ export default function NewInvoiceForm({ payers }: { payers: PayerOption[] }) {
             }
         }
         
-        // Estrategia 2: Si no encuentra, buscar cualquier CompanyID que coincida con uno de la lista
-        if (!payerNit) {
-            const allCompanyIDs = Array.from(xmlDoc.getElementsByTagName('CompanyID'))
-            for (const cid of allCompanyIDs) {
-                if (payers.some(p => p.nit === cid.textContent)) {
-                    payerNit = cid.textContent
-                    break
-                }
-            }
-        }
-
-        // Match Payer
+        // Match Payer (Lógica Mejorada)
         if (payerNit) {
-            const foundPayer = payers.find(p => p.nit === payerNit)
+            const nPayerNit = normalizeNit(payerNit)
+            
+            const foundPayer = payers.find(p => {
+                const nP = normalizeNit(p.nit)
+                // Match exacto de base numérica
+                if (nP === nPayerNit) return true
+                // XML tiene dígito extra (posible DV)
+                if (nPayerNit.length === nP.length + 1 && nPayerNit.startsWith(nP)) return true
+                // DB tiene dígito extra (posible DV)
+                if (nP.length === nPayerNit.length + 1 && nP.startsWith(nPayerNit)) return true
+                
+                return false
+            })
+
             if (foundPayer) {
                 setSelectedPayerId(foundPayer.id)
+            }
+        } else {
+            // Estrategia 2: Buscar en todos los CompanyID si alguno coincide con nuestros payers normalizados
+            const allCompanyIDs = Array.from(xmlDoc.getElementsByTagName('CompanyID'))
+            for (const cid of allCompanyIDs) {
+                const nCid = normalizeNit(cid.textContent)
+                const found = payers.find(p => {
+                    const nP = normalizeNit(p.nit)
+                    return nP === nCid || (nCid.length === nP.length + 1 && nCid.startsWith(nP))
+                })
+                if (found) {
+                    payerNit = cid.textContent // Mantener original para display
+                    setSelectedPayerId(found.id)
+                    break
+                }
             }
         }
 
@@ -204,6 +237,20 @@ export default function NewInvoiceForm({ payers }: { payers: PayerOption[] }) {
             {showFields && (
                 <div className="sm:col-span-2 grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-2 animate-in fade-in slide-in-from-top-4 duration-500">
                     
+                    {isPdf && (
+                        <div className="sm:col-span-2 bg-yellow-50 p-4 rounded-md flex items-start mb-2">
+                            <div className="flex-shrink-0">
+                                <FileText className="h-5 w-5 text-yellow-400" />
+                            </div>
+                            <div className="ml-3">
+                                <h3 className="text-sm font-medium text-yellow-800">Archivo PDF Cargado</h3>
+                                <div className="mt-2 text-sm text-yellow-700">
+                                    <p>Por favor diligencia los datos de la factura manualmente. No realizamos extracción automática de datos desde PDF.</p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     {parsedData && (
                         <div className="sm:col-span-2 bg-blue-50 p-4 rounded-md flex items-start mb-2">
                             <div className="flex-shrink-0">

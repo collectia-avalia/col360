@@ -5,6 +5,10 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { z } from 'zod'
 
+import { Resend } from 'resend'
+
+const resend = new Resend(process.env.RESEND_API_KEY || 're_123456789') // Placeholder seguro
+
 const payerSchema = z.object({
   razonSocial: z.string().min(3),
   contactEmail: z.string().email(),
@@ -70,9 +74,41 @@ export async function createPayerAction(formData: FormData) {
     return { error: 'Error al guardar el pagador: ' + payerError.message }
   }
 
-  // 3. Simular Envío de Correo
-  console.log(`[EMAIL MOCK] Enviando invitación a ${contactEmail} para completar datos de ${razonSocial}. Token: ${invitationToken}`)
-  // Aquí iría la integración con Resend/SendGrid
+  // 3. Enviar Correo con Resend
+  console.log(`[EMAIL] Enviando invitación a ${contactEmail}...`)
+  
+  try {
+    const { data, error: emailError } = await resend.emails.send({
+        from: 'Avalia SaaS <onboarding@resend.dev>', // Usar dominio verificado en Prod
+        to: [contactEmail],
+        subject: 'Invitación al Portal de Pagos - Avalia',
+        html: `
+            <div style="font-family: sans-serif; max-w-600px; margin: 0 auto;">
+                <h2 style="color: #7c3aed;">Bienvenido a Avalia</h2>
+                <p>Hola <strong>${razonSocial}</strong>,</p>
+                <p><strong>${user.email}</strong> te ha invitado a gestionar tus facturas y cupos en nuestra plataforma.</p>
+                <p>Para completar tu registro y acceder al portal, por favor haz clic en el siguiente enlace:</p>
+                <div style="margin: 24px 0;">
+                    <a href="http://localhost:3000/invite/${invitationToken}" style="background-color: #7c3aed; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">
+                        Aceptar Invitación
+                    </a>
+                </div>
+                <p style="color: #666; font-size: 14px;">Si no esperabas este correo, puedes ignorarlo.</p>
+                <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;" />
+                <p style="color: #999; font-size: 12px;">© 2024 Avalia SaaS. Todos los derechos reservados.</p>
+            </div>
+        `
+    })
+
+    if (emailError) {
+        console.error('Error enviando email (Resend):', emailError)
+        // No bloqueamos el flujo, pero logueamos
+    } else {
+        console.log('Email enviado exitosamente:', data)
+    }
+  } catch (err) {
+      console.error('Excepción enviando email:', err)
+  }
 
   revalidatePath('/dashboard/payers')
   redirect('/dashboard/payers')

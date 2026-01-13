@@ -25,7 +25,7 @@ export default async function DashboardPage() {
   const overdueInvoices = allInvoices.filter(inv => inv.status === 'vencida')
   
   const totalPortfolio = activeInvoices.reduce((sum, inv) => sum + (inv.amount || 0), 0) + overdueInvoices.reduce((sum, inv) => sum + (inv.amount || 0), 0)
-  const guaranteedAmount = allInvoices.filter(inv => inv.is_guaranteed && inv.status !== 'pagada').reduce((sum, inv) => sum + (inv.amount || 0), 0)
+  const guaranteedAmount = allInvoices.filter(inv => inv.is_guaranteed && inv.status !== 'pagada').reduce((sum, inv) => sum + (inv.guaranteed_amount || 0), 0)
   const overdueAmount = overdueInvoices.reduce((sum, inv) => sum + (inv.amount || 0), 0)
   
   const coveragePercent = totalPortfolio > 0 ? Math.round((guaranteedAmount / totalPortfolio) * 100) : 0

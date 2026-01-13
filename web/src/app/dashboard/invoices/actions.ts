@@ -55,11 +55,42 @@ export async function createInvoiceAction(formData: FormData) {
     return { error: 'Error consultando el pagador' }
   }
 
-  // Regla: Aprobado Y Cupo Suficiente Y Solicitado por Usuario
-  const isGuaranteed = 
-    wantsGuarantee &&
-    payer.risk_status === 'aprobado' && 
-    (payer.approved_quota || 0) >= numericAmount
+  // Consultar Uso Actual del Cupo (Sumar guaranteed_amount de facturas vigentes)
+  const { data: activeInvoices, error: quotaError } = await supabase
+    .from('invoices')
+    .select('guaranteed_amount')
+    .eq('payer_id', payerId)
+    .neq('status', 'pagada')
+    .eq('is_guaranteed', true)
+
+  const usedQuota = activeInvoices?.reduce((sum, inv) => sum + (inv.guaranteed_amount || 0), 0) || 0
+  const availableQuota = (payer.approved_quota || 0) - usedQuota
+
+  let isGuaranteed = false
+  let guaranteedAmount = 0
+  let warningMessage = null
+
+  if (wantsGuarantee && payer.risk_status === 'aprobado') {
+      if (availableQuota >= numericAmount) {
+          // Caso A: Cupo Total
+          isGuaranteed = true
+          guaranteedAmount = numericAmount
+      } else if (availableQuota > 0) {
+          // Caso B: Garantía Parcial
+          isGuaranteed = true
+          guaranteedAmount = availableQuota
+          
+          const formatter = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 })
+          warningMessage = `Factura parcialmente garantizada por límite de cupo (${formatter.format(guaranteedAmount)} de ${formatter.format(numericAmount)})`
+      } else {
+          // Caso C: Sin Cupo
+          isGuaranteed = false
+          guaranteedAmount = 0
+          warningMessage = "Sin cupo disponible. Factura radicada en Custodia."
+      }
+  } else if (wantsGuarantee && payer.risk_status !== 'aprobado') {
+      warningMessage = "El pagador no está aprobado para garantías. Factura radicada en Custodia."
+  }
 
   // 3. Subir Archivo
   const file = formData.get('fileInvoice') as File
@@ -97,6 +128,7 @@ export async function createInvoiceAction(formData: FormData) {
       file_url: fileUrl,
       status: 'vigente',
       is_guaranteed: isGuaranteed,
+      guaranteed_amount: guaranteedAmount,
       legal_declarations: {
         funds_origin: true,
         factoring_terms: true,
@@ -115,10 +147,15 @@ export async function createInvoiceAction(formData: FormData) {
   // o redirigimos con un parámetro de query.
   // El prompt pide: "Si la factura se radica exitosamente, muestra un Toast... Diferenciación: Si quedó Garantizada..."
   // La mejor forma con Server Actions + Redirección es usar cookies o query params.
-  // Usaré query param: ?status=success&guaranteed=true
+  // Usaré query param: ?status=success&guaranteed=true&message=...
   
   revalidatePath('/dashboard/invoices')
-  redirect(`/dashboard/invoices?status=success&guaranteed=${isGuaranteed}`)
+  const redirectUrl = new URL('/dashboard/invoices', 'http://localhost:3000') // Base URL dummy para constructor
+  redirectUrl.searchParams.set('status', 'success')
+  redirectUrl.searchParams.set('guaranteed', String(isGuaranteed))
+  if (warningMessage) redirectUrl.searchParams.set('message', warningMessage)
+  
+  redirect(`${redirectUrl.pathname}${redirectUrl.search}`)
 }
 
 export async function toggleInvoiceStatus(invoiceId: string, newStatus: string) {

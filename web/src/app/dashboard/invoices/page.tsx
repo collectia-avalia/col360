@@ -20,27 +20,28 @@ export default async function InvoicesPage({
 
   const showSuccess = params['status'] === 'success'
   const isGuaranteed = params['guaranteed'] === 'true'
+  const message = params['message'] as string | undefined
 
   return (
     <div className="max-w-6xl mx-auto">
       {showSuccess && (
-        <div className={`mb-6 p-4 rounded-md flex items-start ${isGuaranteed ? 'bg-green-50' : 'bg-yellow-50'}`}>
+        <div className={`mb-6 p-4 rounded-md flex items-start ${isGuaranteed ? (message ? 'bg-orange-50' : 'bg-green-50') : 'bg-yellow-50'}`}>
           <div className="flex-shrink-0">
             {isGuaranteed ? (
-              <CheckCircle className="h-5 w-5 text-green-400" aria-hidden="true" />
+              message ? <AlertTriangle className="h-5 w-5 text-orange-400" /> : <CheckCircle className="h-5 w-5 text-green-400" aria-hidden="true" />
             ) : (
               <AlertTriangle className="h-5 w-5 text-yellow-400" aria-hidden="true" />
             )}
           </div>
           <div className="ml-3">
-            <h3 className={`text-sm font-medium ${isGuaranteed ? 'text-green-800' : 'text-yellow-800'}`}>
-              {isGuaranteed ? '¡Factura Radicada y Garantizada!' : 'Factura Radicada para Custodia'}
+            <h3 className={`text-sm font-medium ${isGuaranteed ? (message ? 'text-orange-800' : 'text-green-800') : 'text-yellow-800'}`}>
+              {isGuaranteed ? (message ? '¡Factura Radicada con Advertencia!' : '¡Factura Radicada y Garantizada!') : 'Factura Radicada para Custodia'}
             </h3>
-            <div className={`mt-2 text-sm ${isGuaranteed ? 'text-green-700' : 'text-yellow-700'}`}>
+            <div className={`mt-2 text-sm ${isGuaranteed ? (message ? 'text-orange-700' : 'text-green-700') : 'text-yellow-700'}`}>
               <p>
-                {isGuaranteed 
+                {message || (isGuaranteed 
                   ? 'Tu factura cumple con los requisitos y el pagador tiene cupo disponible. Ha sido marcada como Garantizada.' 
-                  : 'La factura ha sido guardada exitosamente, pero el pagador no tiene cupo disponible o no está aprobado. Se guardará solo para gestión.'}
+                  : 'La factura ha sido guardada exitosamente, pero el pagador no tiene cupo disponible o no está aprobado. Se guardará solo para gestión.')}
               </p>
             </div>
           </div>

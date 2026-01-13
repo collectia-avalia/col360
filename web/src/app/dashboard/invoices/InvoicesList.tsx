@@ -24,9 +24,20 @@ export function InvoicesList({ invoices }: { invoices: Invoice[] }) {
   const [searchTerm, setSearchTerm] = useState('')
   const [updatingId, setUpdatingId] = useState<string | null>(null)
 
-  // Calcular métricas
-  const activeInvoices = invoices.filter(inv => inv.status === 'vigente')
-  const overdueInvoices = invoices.filter(inv => inv.status === 'vencida')
+  // Helper para calcular estado visual
+  const getVisualStatus = (invoice: Invoice) => {
+    if (invoice.status === 'pagada') return 'pagada'
+    // Comparar fechas como cadenas YYYY-MM-DD para evitar problemas de zona horaria
+    // Usamos la fecha local del navegador para "hoy"
+    const today = new Date()
+    const todayStr = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0')
+    
+    return invoice.due_date < todayStr ? 'vencida' : 'vigente'
+  }
+
+  // Calcular métricas usando estado visual
+  const activeInvoices = invoices.filter(inv => getVisualStatus(inv) === 'vigente')
+  const overdueInvoices = invoices.filter(inv => getVisualStatus(inv) === 'vencida')
   
   const activeValue = activeInvoices.reduce((sum, inv) => sum + (inv.amount || 0), 0)
   const overdueValue = overdueInvoices.reduce((sum, inv) => sum + (inv.amount || 0), 0)
@@ -40,7 +51,9 @@ export function InvoicesList({ invoices }: { invoices: Invoice[] }) {
     
     if (!matchesSearch) return false
 
-    if (filterStatus !== 'todos' && inv.status !== filterStatus) return false
+    const visualStatus = getVisualStatus(inv)
+
+    if (filterStatus !== 'todos' && visualStatus !== filterStatus) return false
     if (filterGuarantee === 'garantizada' && !inv.is_guaranteed) return false
     if (filterGuarantee === 'custodia' && inv.is_guaranteed) return false
     
@@ -52,16 +65,15 @@ export function InvoicesList({ invoices }: { invoices: Invoice[] }) {
     if (updatingId) return
     setUpdatingId(id)
     
-    // Toggle simple: vigente -> pagada -> vigente (o vencida si fecha pasó)
-    // Para simplificar según requerimiento "Cambiar estado (marcar pagado manual)"
-    // Si está pagada -> volver a vigente/vencida según fecha
-    // Si no está pagada -> pagada
+    // Toggle simple: vigente/vencida -> pagada -> original
+    // Al reabrir, simplemente dejamos que el cálculo visual determine si es vencida o vigente
+    // En BD guardamos 'vigente' (o 'vencida' si quisiéramos persistirlo, pero el requerimiento implica cálculo visual)
+    // Para consistencia con backend, si "reabrimos", lo ponemos en 'vigente' en BD, 
+    // y el frontend lo mostrará rojo si la fecha ya pasó.
     
     let newStatus = 'pagada'
     if (currentStatus === 'pagada') {
-        // Recalcular si está vencida
-        const isOverdue = new Date() > new Date(invoices.find(i => i.id === id)?.due_date || '')
-        newStatus = isOverdue ? 'vencida' : 'vigente'
+        newStatus = 'vigente' // Reset a vigente en BD, el visual se encarga del resto
     }
 
     await toggleInvoiceStatus(id, newStatus)
@@ -202,7 +214,8 @@ export function InvoicesList({ invoices }: { invoices: Invoice[] }) {
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {filteredInvoices.map((invoice) => {
-                const daysOverdue = invoice.status !== 'pagada' ? getDaysOverdue(invoice.due_date) : 0
+                const visualStatus = getVisualStatus(invoice)
+                const daysOverdue = visualStatus !== 'pagada' ? getDaysOverdue(invoice.due_date) : 0
                 return (
               <tr key={invoice.id} className="hover:bg-gray-50 transition-colors">
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
@@ -219,13 +232,13 @@ export function InvoicesList({ invoices }: { invoices: Invoice[] }) {
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full capitalize
-                    ${invoice.status === 'vigente' ? 'bg-blue-100 text-blue-800' : 
-                      invoice.status === 'pagada' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                    {invoice.status}
+                    ${visualStatus === 'vigente' ? 'bg-blue-100 text-blue-800' : 
+                      visualStatus === 'pagada' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                    {visualStatus}
                   </span>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">
-                    {invoice.status !== 'pagada' && daysOverdue > 0 ? (
+                    {visualStatus !== 'pagada' && daysOverdue > 0 ? (
                         <span className="text-red-600 font-bold">{daysOverdue}</span>
                     ) : (
                         '-'
