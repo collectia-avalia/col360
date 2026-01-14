@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { Plus, CheckCircle, AlertTriangle, Filter, Search, Wallet, AlertCircle, TrendingUp, MoreHorizontal, FileText } from 'lucide-react'
 import { toggleInvoiceStatus } from './actions'
@@ -33,6 +33,20 @@ export function InvoicesList({ invoices }: { invoices: Invoice[] }) {
     const todayStr = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0')
     
     return invoice.due_date < todayStr ? 'vencida' : 'vigente'
+  }
+
+  // Estado montado para evitar hydration mismatch
+  const [isMounted, setIsMounted] = useState(false)
+  
+  // Efecto para activar renderizado cliente
+  useEffect(() => {
+    setIsMounted(true)
+  }, [])
+
+  if (!isMounted) {
+      // Renderizar un esqueleto o null para evitar mismatch inicial
+      // O renderizar con un estado "seguro"
+      return <div className="space-y-6 opacity-0">Cargando...</div>
   }
 
   // Calcular métricas usando estado visual
@@ -97,7 +111,7 @@ export function InvoicesList({ invoices }: { invoices: Invoice[] }) {
     <div className="space-y-6">
       
       {/* KPI Cards Mini Dashboard */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <div className="bg-white overflow-hidden rounded-xl shadow-sm border border-gray-200 p-5">
             <div className="flex items-center">
                 <div className="flex-shrink-0 bg-blue-100 rounded-md p-3">
@@ -140,13 +154,13 @@ export function InvoicesList({ invoices }: { invoices: Invoice[] }) {
       </div>
 
       {/* Controls */}
-      <div className="flex flex-col md:flex-row gap-4 justify-between items-center">
+      <div className="flex flex-col lg:flex-row gap-4 justify-between items-start lg:items-center">
         {/* Filtros */}
-        <div className="flex flex-wrap gap-2 w-full md:w-auto">
+        <div className="flex flex-col sm:flex-row flex-wrap gap-2 w-full lg:w-auto">
             <select 
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value)}
-                className="block w-full md:w-auto pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md border"
+                className="block w-full sm:w-auto pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md border shadow-sm"
             >
                 <option value="todos">Todos los Estados</option>
                 <option value="vigente">Vigente</option>
@@ -157,7 +171,7 @@ export function InvoicesList({ invoices }: { invoices: Invoice[] }) {
             <select 
                 value={filterGuarantee}
                 onChange={(e) => setFilterGuarantee(e.target.value)}
-                className="block w-full md:w-auto pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md border"
+                className="block w-full sm:w-auto pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md border shadow-sm"
             >
                 <option value="todos">Todas las Garantías</option>
                 <option value="garantizada">Garantizada</option>
@@ -166,13 +180,13 @@ export function InvoicesList({ invoices }: { invoices: Invoice[] }) {
         </div>
 
         {/* Search */}
-        <div className="relative rounded-md shadow-sm w-full md:max-w-xs">
+        <div className="relative rounded-md shadow-sm w-full lg:max-w-xs">
           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
             <Search className="h-5 w-5 text-gray-400" />
           </div>
           <input
             type="text"
-            className="focus:ring-[#7c3aed] focus:border-[#7c3aed] block w-full pl-10 sm:text-sm border-gray-300 rounded-md py-2 border"
+            className="focus:ring-[#7c3aed] focus:border-[#7c3aed] block w-full pl-10 sm:text-sm border-gray-300 rounded-md py-2 border shadow-sm"
             placeholder="Buscar factura o cliente..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}

@@ -23,17 +23,19 @@ export function KpiCard({ title, value, icon: Icon, trend, color = 'blue' }: Kpi
   return (
     <div className="bg-white overflow-hidden rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow duration-300">
       <div className="p-5">
-        <div className="flex items-center">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
           <div className={`flex-shrink-0 rounded-lg p-3 ${colorStyles[color]}`}>
             <Icon className="h-6 w-6" />
           </div>
-          <div className="ml-5 w-0 flex-1">
-            <dl>
-              <dt className="text-sm font-medium text-gray-500 truncate">{title}</dt>
-              <dd>
-                <div className="text-2xl font-bold text-gray-900">{value}</div>
-              </dd>
-            </dl>
+          <div className="flex-1 min-w-0">
+             <dl>
+               <dt className="text-sm font-medium text-gray-500 truncate mb-1">{title}</dt>
+               <dd>
+                 <div className="text-2xl font-bold text-gray-900 leading-none truncate" title={String(value)}>
+                     {value}
+                 </div>
+               </dd>
+             </dl>
           </div>
         </div>
       </div>

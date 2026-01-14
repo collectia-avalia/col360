@@ -1,7 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
-import { ArrowLeft, Building, FileText, CheckCircle, XCircle, DollarSign, Clock } from 'lucide-react'
+import { ArrowLeft, Building, FileText, CheckCircle, XCircle, DollarSign, Clock, Pencil, Trash2 } from 'lucide-react'
 import { notFound } from 'next/navigation'
+import { PayerActions } from './PayerActions'
 
 export default async function PayerDetailsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -43,17 +44,22 @@ export default async function PayerDetailsPage({ params }: { params: Promise<{ i
   return (
     <div className="max-w-5xl mx-auto space-y-6">
       {/* Header */}
-      <div className="flex items-center space-x-4">
-        <Link 
-          href="/dashboard/payers" 
-          className="p-2 rounded-full hover:bg-slate-100 transition-colors text-slate-500"
-        >
-          <ArrowLeft className="w-5 h-5" />
-        </Link>
-        <div>
-            <h1 className="text-2xl font-bold text-slate-900">{payer.razon_social}</h1>
-            <p className="text-sm text-slate-500">Detalles del pagador y estado de riesgo</p>
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="flex items-center space-x-4">
+            <Link 
+              href="/dashboard/payers" 
+              className="p-2 rounded-full hover:bg-slate-100 transition-colors text-slate-500"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </Link>
+            <div>
+                <h1 className="text-2xl font-bold text-slate-900">{payer.razon_social}</h1>
+                <p className="text-sm text-slate-500">Detalles del pagador y estado de riesgo</p>
+            </div>
         </div>
+        
+        {/* Acciones Client-Side */}
+        <PayerActions payer={payer} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

@@ -4,15 +4,21 @@ import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { z } from 'zod'
-
 import { Resend } from 'resend'
 
-const resend = new Resend(process.env.RESEND_API_KEY || 're_123456789') // Placeholder seguro
+const resend = new Resend(process.env.RESEND_API_KEY)
 
 const payerSchema = z.object({
   razonSocial: z.string().min(3),
   contactEmail: z.string().email(),
-  authContact: z.literal('on'), // Checkbox value
+  authContact: z.literal('on'),
+})
+
+// Esquema de validación para edición
+const UpdatePayerSchema = z.object({
+  id: z.string().uuid(),
+  razon_social: z.string().min(1, "La razón social es obligatoria"),
+  contact_email: z.string().email().optional(),
 })
 
 export async function createPayerAction(formData: FormData) {
@@ -38,16 +44,7 @@ export async function createPayerAction(formData: FormData) {
 
   const { razonSocial, contactEmail } = validation.data
 
-  // Generar NIT Temporal (Placeholder para que pase la restricción NOT NULL si la migración no corrió)
-  // En producción real, la migración haría la columna NULLABLE.
-  // Aquí usamos un placeholder único.
   const tempNit = `PENDING-${Date.now()}`
-
-  // 2. Crear Pagador en BD (Modo Invitación)
-  // Intentamos insertar con los nuevos campos. Si falla (porque no existen), fallará la acción.
-  // Asumimos que la migración se aplicará.
-  
-  // Generar Token (Mock)
   const invitationToken = crypto.randomUUID()
 
   const { data: payer, error: payerError } = await supabase
@@ -67,7 +64,6 @@ export async function createPayerAction(formData: FormData) {
 
   if (payerError) {
     console.error('Error creando pagador:', payerError)
-    // Fallback por si las columnas nuevas no existen aun
     if (payerError.message.includes('column "invitation_status" of relation "payers" does not exist')) {
          return { error: 'Error de base de datos: Faltan migraciones (invitation_status). Contacte soporte.' }
     }
@@ -75,8 +71,6 @@ export async function createPayerAction(formData: FormData) {
   }
 
   // 3. Enviar Correo con Resend
-  console.log(`[EMAIL] Enviando invitación a ${contactEmail}...`)
-  
   try {
     const { data, error: emailError } = await resend.emails.send({
         from: 'Avalia SaaS <onboarding@resend.dev>', // Usar dominio verificado en Prod
@@ -102,9 +96,6 @@ export async function createPayerAction(formData: FormData) {
 
     if (emailError) {
         console.error('Error enviando email (Resend):', emailError)
-        // No bloqueamos el flujo, pero logueamos
-    } else {
-        console.log('Email enviado exitosamente:', data)
     }
   } catch (err) {
       console.error('Excepción enviando email:', err)
@@ -112,4 +103,81 @@ export async function createPayerAction(formData: FormData) {
 
   revalidatePath('/dashboard/payers')
   redirect('/dashboard/payers')
+}
+
+export async function deletePayerAction(payerId: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) return { error: 'No autorizado' }
+
+  // Check if invoices exist
+  const { count, error: countError } = await supabase
+    .from('invoices')
+    .select('*', { count: 'exact', head: true })
+    .eq('payer_id', payerId)
+
+  if (countError) {
+      console.error('Error checking invoices:', countError)
+      return { error: 'Error verificando facturas del cliente' }
+  }
+
+  if (count && count > 0) {
+      return { error: 'No se puede eliminar el cliente porque tiene facturas asociadas. Elimina las facturas primero.' }
+  }
+
+  const { error } = await supabase
+    .from('payers')
+    .delete()
+    .eq('id', payerId)
+    .eq('created_by', user.id)
+
+  if (error) {
+    console.error('Error deleting payer:', error)
+    return { error: 'Error eliminando el cliente' }
+  }
+
+  revalidatePath('/dashboard/payers')
+  return { success: true }
+}
+
+export async function updatePayerAction(formData: FormData) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) return { error: 'No autorizado' }
+
+  // 1. LIMPIEZA DE DATOS (Vital para evitar el error de NULL)
+  const rawFormData = {
+    id: formData.get('id')?.toString(),
+    razon_social: formData.get('razon_social')?.toString(),
+    // El truco: Si es null o vacío, enviamos undefined para que Zod lo acepte como opcional
+    contact_name: formData.get('contact_name')?.toString() || undefined,
+    contact_phone: formData.get('contact_phone')?.toString() || undefined,
+    contact_email: formData.get('contact_email')?.toString() || undefined,
+  }
+
+  // 2. VALIDAR CON ZOD
+  const validatedFields = UpdatePayerSchema.safeParse(rawFormData)
+
+  if (!validatedFields.success) {
+      console.error("❌ Zod Error Detallado:", validatedFields.error.flatten().fieldErrors);
+      return { error: 'Datos inválidos (Revisa consola del servidor)' }
+  }
+
+  const { id, ...dataToUpdate } = validatedFields.data
+
+  const { error } = await supabase
+    .from('payers')
+    .update(dataToUpdate)
+    .eq('id', id)
+    .eq('created_by', user.id)
+
+  if (error) {
+      console.error('Error updating payer:', error)
+      return { error: 'Error actualizando el cliente' }
+  }
+
+  revalidatePath('/dashboard/payers')
+  return { success: true }
 }

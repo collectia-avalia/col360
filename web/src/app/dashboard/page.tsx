@@ -21,8 +21,15 @@ export default async function DashboardPage() {
   const allInvoices = invoices || []
 
   // 2. Procesamiento de KPIs
-  const activeInvoices = allInvoices.filter(inv => inv.status === 'vigente')
-  const overdueInvoices = allInvoices.filter(inv => inv.status === 'vencida')
+  const getVisualStatus = (invoice: any) => {
+    if (invoice.status === 'pagada') return 'pagada'
+    const today = new Date()
+    const todayStr = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0')
+    return invoice.due_date < todayStr ? 'vencida' : 'vigente'
+  }
+
+  const activeInvoices = allInvoices.filter(inv => getVisualStatus(inv) === 'vigente')
+  const overdueInvoices = allInvoices.filter(inv => getVisualStatus(inv) === 'vencida')
   
   const totalPortfolio = activeInvoices.reduce((sum, inv) => sum + (inv.amount || 0), 0) + overdueInvoices.reduce((sum, inv) => sum + (inv.amount || 0), 0)
   const guaranteedAmount = allInvoices.filter(inv => inv.is_guaranteed && inv.status !== 'pagada').reduce((sum, inv) => sum + (inv.guaranteed_amount || 0), 0)
@@ -50,7 +57,7 @@ export default async function DashboardPage() {
   const statusCounts = {
     vigente: activeInvoices.length,
     vencida: overdueInvoices.length,
-    pagada: allInvoices.filter(inv => inv.status === 'pagada').length
+    pagada: allInvoices.filter(inv => getVisualStatus(inv) === 'pagada').length
   }
   
   const pieData = [
@@ -194,9 +201,9 @@ export default async function DashboardPage() {
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap">
                                     <span className={`px-2.5 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full capitalize
-                                        ${inv.status === 'vigente' ? 'bg-blue-100 text-blue-800' : 
-                                          inv.status === 'pagada' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                                        {inv.status}
+                                        ${getVisualStatus(inv) === 'vigente' ? 'bg-blue-100 text-blue-800' : 
+                                          getVisualStatus(inv) === 'pagada' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                                        {getVisualStatus(inv)}
                                     </span>
                                 </td>
                             </tr>
