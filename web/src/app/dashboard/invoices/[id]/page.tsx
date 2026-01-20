@@ -3,6 +3,8 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, FileText, Calendar, DollarSign, MessageSquare, Mail, AlertTriangle, CheckCircle, Clock } from 'lucide-react'
 
+import { EmailButton } from '../EmailButton'
+
 export default async function InvoiceDetailPage({
   params,
 }: {
@@ -86,13 +88,13 @@ export default async function InvoiceDetailPage({
                     <MessageSquare className="-ml-1 mr-2 h-4 w-4" />
                     Contactar por WhatsApp
                 </a>
-                <a 
-                    href={`mailto:${invoice.payers?.contact_email}?subject=Gestión Factura ${invoice.invoice_number}&body=${whatsappMessage}`}
-                    className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none transition-colors"
-                >
-                    <Mail className="-ml-1 mr-2 h-4 w-4" />
-                    Enviar Email
-                </a>
+                <EmailButton 
+                    invoiceId={invoice.id}
+                    email={invoice.payers?.contact_email || ''}
+                    subject={`Gestión Factura ${invoice.invoice_number}`}
+                    body={whatsappMessage}
+                    disabled={!invoice.payers?.contact_email}
+                />
             </div>
         </div>
       </div>

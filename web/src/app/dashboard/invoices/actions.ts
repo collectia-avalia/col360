@@ -4,6 +4,9 @@ import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { z } from 'zod'
+import { Resend } from 'resend'
+
+const resend = new Resend(process.env.RESEND_API_KEY)
 
 const invoiceSchema = z.object({
   invoiceNumber: z.string().min(1),
@@ -143,19 +146,14 @@ export async function createInvoiceAction(formData: FormData) {
   }
 
   // Retornamos el estado para mostrar feedback en el cliente
-  // No redirigimos inmediatamente para poder mostrar el Toast, 
-  // o redirigimos con un parámetro de query.
-  // El prompt pide: "Si la factura se radica exitosamente, muestra un Toast... Diferenciación: Si quedó Garantizada..."
-  // La mejor forma con Server Actions + Redirección es usar cookies o query params.
-  // Usaré query param: ?status=success&guaranteed=true&message=...
-  
   revalidatePath('/dashboard/invoices')
-  const redirectUrl = new URL('/dashboard/invoices', 'http://localhost:3000') // Base URL dummy para constructor
-  redirectUrl.searchParams.set('status', 'success')
-  redirectUrl.searchParams.set('guaranteed', String(isGuaranteed))
-  if (warningMessage) redirectUrl.searchParams.set('message', warningMessage)
   
-  redirect(`${redirectUrl.pathname}${redirectUrl.search}`)
+  return { 
+      success: true, 
+      message: warningMessage || (isGuaranteed ? "Factura radicada y garantizada exitosamente." : "Factura radicada correctamente."),
+      isGuaranteed,
+      warningMessage
+  }
 }
 
 export async function toggleInvoiceStatus(invoiceId: string, newStatus: string) {
@@ -176,4 +174,32 @@ export async function toggleInvoiceStatus(invoiceId: string, newStatus: string) 
 
   revalidatePath('/dashboard/invoices')
   return { success: true }
+}
+
+export async function sendInvoiceEmailAction(invoiceId: string, email: string, subject: string, body: string) {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { error: 'No autorizado' }
+
+    try {
+        const { data, error } = await resend.emails.send({
+            from: 'Avalia SaaS <onboarding@resend.dev>',
+            to: [email],
+            subject: subject,
+            text: body,
+        })
+
+        if (error) {
+            console.error('Error enviando email:', error)
+            return { error: 'Error enviando el correo: ' + error.message }
+        }
+
+        console.log(`[AUDIT] Email enviado por ${user.email} para factura ${invoiceId} a ${email} | ID Resend: ${data?.id}`)
+        
+        return { success: true }
+
+    } catch (err) {
+        console.error('Excepción enviando email:', err)
+        return { error: 'Error inesperado al enviar correo' }
+    }
 }

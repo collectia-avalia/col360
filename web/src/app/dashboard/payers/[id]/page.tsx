@@ -3,15 +3,16 @@ import Link from 'next/link'
 import { ArrowLeft, Building, FileText, CheckCircle, XCircle, DollarSign, Clock, Pencil, Trash2 } from 'lucide-react'
 import { notFound } from 'next/navigation'
 import { PayerActions } from './PayerActions'
+import { InvoicesTable } from './InvoicesTable'
 
 export default async function PayerDetailsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const supabase = await createClient()
   
-  // Obtener detalles del pagador
+  // Obtener detalles del pagador CON sus facturas
   const { data: payer, error } = await supabase
     .from('payers')
-    .select('*')
+    .select('*, invoices(*)') // Traemos la relación de facturas
     .eq('id', id)
     .single()
 
@@ -183,6 +184,12 @@ export default async function PayerDetailsPage({ params }: { params: Promise<{ i
                 </div>
             </div>
         </div>
+      </div>
+
+      {/* Historial de Facturas */}
+      <div className="space-y-4">
+        <h2 className="text-lg font-semibold text-slate-900">Historial de Facturas</h2>
+        <InvoicesTable invoices={payer.invoices || []} payerId={payer.id} />
       </div>
     </div>
   )

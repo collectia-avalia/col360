@@ -1,25 +1,23 @@
 'use client'
 
 import { createInvoiceAction } from '../actions'
-import { useFormStatus } from 'react-dom'
-import { useState } from 'react'
+import { useState, useTransition } from 'react'
 import Link from 'next/link'
-import { useSearchParams } from 'next/navigation'
+import { useSearchParams, useRouter } from 'next/navigation'
 import { Loader2, UploadCloud, FileText, Calendar, DollarSign, ShieldCheck } from 'lucide-react'
+import { useToast } from '@/components/ui/Toast'
 
-function SubmitButton() {
-  const { pending } = useFormStatus()
-
+function SubmitButton({ isPending }: { isPending: boolean }) {
   return (
     <button
       type="submit"
-      disabled={pending}
+      disabled={isPending}
       className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-[#7c3aed] hover:bg-[#6d28d9] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#7c3aed] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
     >
-      {pending ? (
+      {isPending ? (
         <>
           <Loader2 className="animate-spin -ml-1 mr-2 h-5 w-5" />
-          Radicando Factura...
+          Radicando...
         </>
       ) : (
         'Radicar Factura'
@@ -35,10 +33,13 @@ type PayerOption = {
 }
 
 export default function NewInvoiceForm({ payers }: { payers: PayerOption[] }) {
+  const router = useRouter()
+  const { toast } = useToast()
   const searchParams = useSearchParams()
   const defaultPayerId = searchParams.get('payerId') || ''
   const [selectedPayerId, setSelectedPayerId] = useState(defaultPayerId)
   const [error, setError] = useState<string | null>(null)
+  const [isPending, startTransition] = useTransition()
   const [fileName, setFileName] = useState<string | null>(null)
   const [parsedData, setParsedData] = useState<{
     invoiceNumber?: string
@@ -160,12 +161,25 @@ export default function NewInvoiceForm({ payers }: { payers: PayerOption[] }) {
     setShowFields(true)
   }
 
-  async function handleSubmit(formData: FormData) {
+  const handleSubmit = (formData: FormData) => {
     setError(null)
-    const result = await createInvoiceAction(formData)
-    if (result?.error) {
-      setError(result.error)
-    }
+    
+    startTransition(async () => {
+      const result = await createInvoiceAction(formData)
+      
+      if (result?.error) {
+        setError(result.error)
+        toast(result.error, 'error')
+      } else if (result?.success) {
+        // Warning para garantía parcial
+        if (result.warningMessage) {
+            toast(result.warningMessage, 'success') // Usamos success pero con mensaje de advertencia
+        } else {
+            toast(result.message || 'Factura radicada correctamente', 'success')
+        }
+        router.push('/dashboard/invoices')
+      }
+    })
   }
 
   return (
@@ -380,7 +394,7 @@ export default function NewInvoiceForm({ payers }: { payers: PayerOption[] }) {
                             Cancelar
                         </Link>
                         <div className="w-full sm:w-auto">
-                            <SubmitButton />
+                            <SubmitButton isPending={isPending} />
                         </div>
                     </div>
                 </div>

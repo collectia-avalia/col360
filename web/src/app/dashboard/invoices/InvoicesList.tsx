@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { Plus, CheckCircle, AlertTriangle, Filter, Search, Wallet, AlertCircle, TrendingUp, MoreHorizontal, FileText } from 'lucide-react'
 import { toggleInvoiceStatus } from './actions'
+import { ExportButton } from '@/components/ui/ExportButton'
 
 interface Invoice {
   id: string
@@ -68,6 +69,10 @@ export function InvoicesList({ invoices }: { invoices: Invoice[] }) {
     const visualStatus = getVisualStatus(inv)
 
     if (filterStatus !== 'todos' && visualStatus !== filterStatus) return false
+    
+    // Corrección lógica para "Solo Custodia": Si NO está garantizada, es custodia.
+    // Si filtro es 'custodia', busco inv.is_guaranteed === false
+    // Si filtro es 'garantizada', busco inv.is_guaranteed === true
     if (filterGuarantee === 'garantizada' && !inv.is_guaranteed) return false
     if (filterGuarantee === 'custodia' && inv.is_guaranteed) return false
     
@@ -106,6 +111,17 @@ export function InvoicesList({ invoices }: { invoices: Invoice[] }) {
     if (now <= due) return 0
     return diffDays
   }
+
+  // Preparar datos para exportación
+  const exportData = filteredInvoices.map(inv => ({
+      Numero_Factura: inv.invoice_number,
+      Pagador: inv.payers?.razon_social,
+      Monto: inv.amount,
+      Fecha_Emision: inv.issue_date,
+      Fecha_Vencimiento: inv.due_date,
+      Estado: getVisualStatus(inv),
+      Garantizada: inv.is_guaranteed ? 'SI' : 'NO'
+  }))
 
   return (
     <div className="space-y-6">
@@ -180,17 +196,20 @@ export function InvoicesList({ invoices }: { invoices: Invoice[] }) {
         </div>
 
         {/* Search */}
-        <div className="relative rounded-md shadow-sm w-full lg:max-w-xs">
-          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-            <Search className="h-5 w-5 text-gray-400" />
-          </div>
-          <input
-            type="text"
-            className="focus:ring-[#7c3aed] focus:border-[#7c3aed] block w-full pl-10 sm:text-sm border-gray-300 rounded-md py-2 border shadow-sm"
-            placeholder="Buscar factura o cliente..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
+        <div className="flex gap-2 w-full lg:max-w-md">
+            <div className="relative rounded-md shadow-sm w-full">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <Search className="h-5 w-5 text-gray-400" />
+            </div>
+            <input
+                type="text"
+                className="focus:ring-[#7c3aed] focus:border-[#7c3aed] block w-full pl-10 sm:text-sm border-gray-300 rounded-md py-2 border shadow-sm"
+                placeholder="Buscar factura o cliente..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+            />
+            </div>
+            <ExportButton data={exportData} filename="facturas_avalia.csv" label="Exportar" />
         </div>
       </div>
 

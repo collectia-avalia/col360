@@ -102,7 +102,7 @@ export async function createPayerAction(formData: FormData) {
   }
 
   revalidatePath('/dashboard/payers')
-  redirect('/dashboard/payers')
+  return { success: true, message: `Invitación enviada correctamente a ${contactEmail}` }
 }
 
 export async function deletePayerAction(payerId: string) {

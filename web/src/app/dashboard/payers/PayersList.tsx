@@ -7,6 +7,7 @@ import { KpiCard } from '@/components/dashboard/KpiCard'
 import { deletePayerAction, updatePayerAction } from './actions'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
+import { ExportButton } from '@/components/ui/ExportButton'
 
 interface Payer {
   id: string
@@ -151,6 +152,8 @@ export function PayersList({ payers }: { payers: Payer[] }) {
 
     if (filter === 'todos') return true
     if (filter === 'aprobados') return payer.risk_status === 'aprobado'
+    // Corrección: Filtrar por "vencidos" significa que tienen al menos 1 factura vencida (overdueValue > 0)
+    // El filtro previo funcionaba bien, pero lo hacemos explícito para mayor claridad
     if (filter === 'vencidos') return payer.stats.overdueValue > 0
     if (filter === 'no_aprobados') return payer.risk_status === 'rechazado'
     if (filter === 'en_estudio') return payer.risk_status === 'pendiente'
@@ -160,6 +163,19 @@ export function PayersList({ payers }: { payers: Payer[] }) {
 
   const formatCurrency = (val: number) => 
     new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(val)
+
+  // Preparar datos para exportación
+  const exportData = filteredPayers.map(p => ({
+      Razon_Social: p.razon_social,
+      NIT: p.nit,
+      Email: p.contact_email || '',
+      Estado_Riesgo: p.risk_status,
+      Cupo_Aprobado: p.approved_quota,
+      Facturas_Vigentes: p.stats.invoiceCount,
+      Valor_Vigente: p.stats.activeValue,
+      Valor_Vencido: p.stats.overdueValue,
+      Cupo_Consumido: p.stats.consumedQuota
+  }))
 
   return (
     <div className="space-y-6">
@@ -244,17 +260,20 @@ export function PayersList({ payers }: { payers: Payer[] }) {
         </div>
 
         {/* Search */}
-        <div className="relative rounded-md shadow-sm w-full sm:max-w-xs">
-          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-            <Search className="h-5 w-5 text-gray-400" />
-          </div>
-          <input
-            type="text"
-            className="focus:ring-[#7c3aed] focus:border-[#7c3aed] block w-full pl-10 sm:text-sm border-gray-300 rounded-md py-2 border"
-            placeholder="Buscar cliente..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
+        <div className="flex gap-2 w-full sm:max-w-md">
+            <div className="relative rounded-md shadow-sm w-full">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <Search className="h-5 w-5 text-gray-400" />
+            </div>
+            <input
+                type="text"
+                className="focus:ring-[#7c3aed] focus:border-[#7c3aed] block w-full pl-10 sm:text-sm border-gray-300 rounded-md py-2 border"
+                placeholder="Buscar cliente..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+            />
+            </div>
+            <ExportButton data={exportData} filename="clientes_avalia.csv" label="Exportar" />
         </div>
       </div>
 

@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { KpiCard } from '@/components/dashboard/KpiCard'
 import { InvoiceChart } from '@/components/dashboard/InvoiceChart'
 import { StatusDistributionChart } from '@/components/dashboard/StatusDistributionChart'
+import { ExportButton } from '@/components/ui/ExportButton'
 
 export default async function DashboardPage() {
   const supabase = await createClient()
@@ -71,6 +72,16 @@ export default async function DashboardPage() {
   const formatCurrency = (amount: number) => 
     new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(amount)
 
+  // Preparar datos para exportación
+  const exportData = allInvoices.map(inv => ({
+      Numero_Factura: inv.invoice_number,
+      Monto: inv.amount,
+      Fecha_Emision: inv.issue_date,
+      Fecha_Vencimiento: inv.due_date,
+      Estado: getVisualStatus(inv),
+      Garantizada: inv.is_guaranteed ? 'SI' : 'NO'
+  }))
+
   return (
     <div className="min-h-screen bg-gray-50/50 pb-12">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -82,14 +93,17 @@ export default async function DashboardPage() {
             <p className="mt-1 text-sm text-gray-500">Visión general de tu operación y estado de cartera.</p>
           </div>
           <div className="mt-4 md:mt-0 flex space-x-3">
-             <button className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+             {/* Filtros ocultos temporalmente hasta implementación completa */}
+             {/* <button className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
                 <Filter className="h-4 w-4 mr-2 text-gray-500" />
                 Filtros
-             </button>
-             <button className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700">
-                <Download className="h-4 w-4 mr-2" />
-                Exportar Informe
-             </button>
+             </button> */}
+             <ExportButton 
+                data={exportData} 
+                filename="informe_general_avalia.csv" 
+                label="Exportar Informe" 
+                className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none transition-colors"
+             />
           </div>
         </div>
 
