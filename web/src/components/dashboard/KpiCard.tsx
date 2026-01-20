@@ -1,4 +1,5 @@
 import { LucideIcon } from 'lucide-react'
+import Link from 'next/link'
 
 interface KpiCardProps {
   title: string
@@ -10,9 +11,10 @@ interface KpiCardProps {
     positive: boolean
   }
   color?: 'blue' | 'green' | 'red' | 'purple'
+  href?: string
 }
 
-export function KpiCard({ title, value, icon: Icon, trend, color = 'blue' }: KpiCardProps) {
+export function KpiCard({ title, value, icon: Icon, trend, color = 'blue', href }: KpiCardProps) {
   const colorStyles = {
     blue: 'bg-avalia-blue/10 text-avalia-blue',
     green: 'bg-green-50 text-green-600',
@@ -20,8 +22,8 @@ export function KpiCard({ title, value, icon: Icon, trend, color = 'blue' }: Kpi
     purple: 'bg-avalia-violet/10 text-avalia-violet',
   }
 
-  return (
-    <div className="bg-white overflow-hidden rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow duration-300">
+  const CardContent = (
+    <>
       <div className="p-5">
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
           <div className={`flex-shrink-0 rounded-lg p-3 ${colorStyles[color]}`}>
@@ -47,6 +49,23 @@ export function KpiCard({ title, value, icon: Icon, trend, color = 'blue' }: Kpi
           </div>
         </div>
       )}
+    </>
+  )
+
+  const containerClasses = "bg-white overflow-hidden rounded-xl border border-gray-100 shadow-sm transition-all duration-300 block"
+  const interactiveClasses = href ? "hover:shadow-md hover:border-gray-200 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2" : ""
+
+  if (href) {
+    return (
+      <Link href={href} className={`${containerClasses} ${interactiveClasses}`}>
+        {CardContent}
+      </Link>
+    )
+  }
+
+  return (
+    <div className={`${containerClasses}`}>
+      {CardContent}
     </div>
   )
 }

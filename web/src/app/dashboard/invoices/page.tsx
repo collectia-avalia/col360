@@ -18,7 +18,10 @@ export default async function InvoicesPage({
     .eq('client_id', user?.id)
     .order('created_at', { ascending: false })
 
-  const showSuccess = params['status'] === 'success'
+  const filterStatusParam = typeof params['status'] === 'string' ? params['status'] : undefined
+  const initialFilterStatus = filterStatusParam && ['vigente', 'vencida', 'pagada'].includes(filterStatusParam) ? filterStatusParam : 'todos'
+
+  const showSuccess = params['result'] === 'success'
   const isGuaranteed = params['guaranteed'] === 'true'
   const message = params['message'] as string | undefined
 
@@ -62,7 +65,7 @@ export default async function InvoicesPage({
         </Link>
       </div>
 
-      <InvoicesList invoices={invoices || []} />
+      <InvoicesList invoices={invoices || []} initialFilterStatus={initialFilterStatus} />
     </div>
   )
 }

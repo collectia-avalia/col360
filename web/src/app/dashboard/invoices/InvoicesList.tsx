@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { Plus, CheckCircle, AlertTriangle, Filter, Search, Wallet, AlertCircle, TrendingUp, MoreHorizontal, FileText } from 'lucide-react'
+import { CheckCircle, Search, Wallet, AlertCircle, TrendingUp, Clock } from 'lucide-react'
 import { toggleInvoiceStatus } from './actions'
 import { ExportButton } from '@/components/ui/ExportButton'
 
@@ -19,8 +19,8 @@ interface Invoice {
   }
 }
 
-export function InvoicesList({ invoices }: { invoices: Invoice[] }) {
-  const [filterStatus, setFilterStatus] = useState('todos')
+export function InvoicesList({ invoices, initialFilterStatus }: { invoices: Invoice[], initialFilterStatus: string }) {
+  const [filterStatus, setFilterStatus] = useState(initialFilterStatus || 'todos')
   const [filterGuarantee, setFilterGuarantee] = useState('todos')
   const [searchTerm, setSearchTerm] = useState('')
   const [updatingId, setUpdatingId] = useState<string | null>(null)
@@ -44,42 +44,71 @@ export function InvoicesList({ invoices }: { invoices: Invoice[] }) {
     setIsMounted(true)
   }, [])
 
+  useEffect(() => {
+    setFilterStatus(initialFilterStatus || 'todos')
+  }, [initialFilterStatus])
+
   if (!isMounted) {
       // Renderizar un esqueleto o null para evitar mismatch inicial
       // O renderizar con un estado "seguro"
       return <div className="space-y-6 opacity-0">Cargando...</div>
   }
 
-  // Calcular métricas usando estado visual
-  const activeInvoices = invoices.filter(inv => getVisualStatus(inv) === 'vigente')
-  const overdueInvoices = invoices.filter(inv => getVisualStatus(inv) === 'vencida')
-  
-  const activeValue = activeInvoices.reduce((sum, inv) => sum + (inv.amount || 0), 0)
-  const overdueValue = overdueInvoices.reduce((sum, inv) => sum + (inv.amount || 0), 0)
-  const totalValue = activeValue + overdueValue
-
-  // Filtrar
-  const filteredInvoices = invoices.filter(inv => {
+  // 1. Filtrar por contexto (Garantía y Búsqueda) - Base para las cards
+  const contextInvoices = invoices.filter(inv => {
     const matchesSearch = 
       inv.invoice_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
       inv.payers?.razon_social.toLowerCase().includes(searchTerm.toLowerCase())
     
     if (!matchesSearch) return false
 
-    const visualStatus = getVisualStatus(inv)
-
-    if (filterStatus !== 'todos' && visualStatus !== filterStatus) return false
-    
-    // Corrección lógica para "Solo Custodia": Si NO está garantizada, es custodia.
-    // Si filtro es 'custodia', busco inv.is_guaranteed === false
-    // Si filtro es 'garantizada', busco inv.is_guaranteed === true
     if (filterGuarantee === 'garantizada' && !inv.is_guaranteed) return false
     if (filterGuarantee === 'custodia' && inv.is_guaranteed) return false
     
     return true
   })
 
-  // Acciones
+  // 2. Calcular métricas basadas en el contexto actual
+  const activeContextInvoices = contextInvoices.filter(inv => getVisualStatus(inv) === 'vigente')
+  const overdueContextInvoices = contextInvoices.filter(inv => getVisualStatus(inv) === 'vencida')
+  
+  const activeValue = activeContextInvoices.reduce((sum, inv) => sum + (inv.amount || 0), 0)
+  const overdueValue = overdueContextInvoices.reduce((sum, inv) => sum + (inv.amount || 0), 0)
+  const totalValue = activeValue + overdueValue
+
+  const today = new Date()
+  const todayStr = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0')
+  const limitDate = new Date(today)
+  limitDate.setDate(today.getDate() + 30)
+  const limitStr = limitDate.getFullYear() + '-' + String(limitDate.getMonth() + 1).padStart(2, '0') + '-' + String(limitDate.getDate()).padStart(2, '0')
+
+  const upcomingInvoices = contextInvoices.filter(inv => {
+    if (inv.status === 'pagada') return false
+    if (inv.due_date < todayStr) return false
+    return inv.due_date <= limitStr
+  })
+
+  // 3. Filtrar para la tabla (Aplicar estado seleccionado)
+  const filteredInvoices = contextInvoices.filter(inv => {
+    if (filterStatus === 'todos') return getVisualStatus(inv) !== 'pagada' // 'todos' en dashboard suele ser cartera activa (no pagada)
+    if (filterStatus === 'pagada') return getVisualStatus(inv) === 'pagada'
+    if (filterStatus === 'proximas') {
+      // Reutilizar lógica de upcoming
+      if (inv.status === 'pagada') return false
+      if (inv.due_date < todayStr) return false
+      return inv.due_date <= limitStr
+    }
+    return getVisualStatus(inv) === filterStatus
+  })
+
+  // Helper para estilos de tarjeta activa
+  const getCardClass = (status: string) => {
+    const baseClass = "bg-white overflow-hidden rounded-xl shadow-sm border p-5 text-left transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
+    const activeClass = "ring-2 ring-indigo-500 border-indigo-500 bg-indigo-50"
+    const inactiveClass = "border-gray-200 hover:bg-gray-50 hover:border-gray-300"
+    
+    return `${baseClass} ${filterStatus === status ? activeClass : inactiveClass}`
+  }
   const handleStatusChange = async (id: string, currentStatus: string) => {
     if (updatingId) return
     setUpdatingId(id)
@@ -127,8 +156,8 @@ export function InvoicesList({ invoices }: { invoices: Invoice[] }) {
     <div className="space-y-6">
       
       {/* KPI Cards Mini Dashboard */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <div className="bg-white overflow-hidden rounded-xl shadow-sm border border-gray-200 p-5">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <button type="button" onClick={() => setFilterStatus('vigente')} className={getCardClass('vigente')}>
             <div className="flex items-center">
                 <div className="flex-shrink-0 bg-blue-100 rounded-md p-3">
                     <TrendingUp className="h-6 w-6 text-blue-600" />
@@ -136,12 +165,13 @@ export function InvoicesList({ invoices }: { invoices: Invoice[] }) {
                 <div className="ml-5 w-0 flex-1">
                     <dl>
                         <dt className="text-sm font-medium text-gray-500 truncate">Vigentes</dt>
-                        <dd className="text-lg font-bold text-gray-900">{activeInvoices.length} ({formatCurrency(activeValue)})</dd>
+                        <dd className="text-2xl font-bold text-gray-900">{activeContextInvoices.length}</dd>
+                        <dd className="text-sm text-gray-500">{formatCurrency(activeValue)}</dd>
                     </dl>
                 </div>
             </div>
-        </div>
-        <div className="bg-white overflow-hidden rounded-xl shadow-sm border border-gray-200 p-5">
+        </button>
+        <button type="button" onClick={() => setFilterStatus('vencida')} className={getCardClass('vencida')}>
             <div className="flex items-center">
                 <div className="flex-shrink-0 bg-red-100 rounded-md p-3">
                     <AlertCircle className="h-6 w-6 text-red-600" />
@@ -149,12 +179,13 @@ export function InvoicesList({ invoices }: { invoices: Invoice[] }) {
                 <div className="ml-5 w-0 flex-1">
                     <dl>
                         <dt className="text-sm font-medium text-gray-500 truncate">Vencidas</dt>
-                        <dd className="text-lg font-bold text-gray-900">{overdueInvoices.length} ({formatCurrency(overdueValue)})</dd>
+                        <dd className="text-2xl font-bold text-gray-900">{overdueContextInvoices.length}</dd>
+                        <dd className="text-sm text-gray-500">{formatCurrency(overdueValue)}</dd>
                     </dl>
                 </div>
             </div>
-        </div>
-        <div className="bg-white overflow-hidden rounded-xl shadow-sm border border-gray-200 p-5">
+        </button>
+        <button type="button" onClick={() => setFilterStatus('todos')} className={getCardClass('todos')}>
             <div className="flex items-center">
                 <div className="flex-shrink-0 bg-gray-100 rounded-md p-3">
                     <Wallet className="h-6 w-6 text-gray-600" />
@@ -162,11 +193,25 @@ export function InvoicesList({ invoices }: { invoices: Invoice[] }) {
                 <div className="ml-5 w-0 flex-1">
                     <dl>
                         <dt className="text-sm font-medium text-gray-500 truncate">Total Cartera</dt>
-                        <dd className="text-lg font-bold text-gray-900">{formatCurrency(totalValue)}</dd>
+                        <dd className="text-2xl font-bold text-gray-900">{formatCurrency(totalValue)}</dd>
                     </dl>
                 </div>
             </div>
-        </div>
+        </button>
+        <button type="button" onClick={() => setFilterStatus('proximas')} className={getCardClass('proximas')}>
+            <div className="flex items-center">
+                <div className="flex-shrink-0 bg-yellow-100 rounded-md p-3">
+                    <Clock className="h-6 w-6 text-yellow-600" />
+                </div>
+                <div className="ml-5 w-0 flex-1">
+                    <dl>
+                        <dt className="text-sm font-medium text-gray-500 truncate">Próximas a Vencer</dt>
+                        <dd className="text-2xl font-bold text-gray-900">{upcomingInvoices.length}</dd>
+                        <dd className="text-sm text-gray-500">≤ 30 días</dd>
+                    </dl>
+                </div>
+            </div>
+        </button>
       </div>
 
       {/* Controls */}
@@ -181,6 +226,7 @@ export function InvoicesList({ invoices }: { invoices: Invoice[] }) {
                 <option value="todos">Todos los Estados</option>
                 <option value="vigente">Vigente</option>
                 <option value="vencida">Vencida</option>
+                <option value="proximas">Próximas a Vencer</option>
                 <option value="pagada">Pagada</option>
             </select>
 

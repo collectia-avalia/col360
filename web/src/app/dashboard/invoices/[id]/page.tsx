@@ -58,6 +58,24 @@ export default async function InvoiceDetailPage({
   // Formatear Moneda
   const formatCurrency = (val: number) => 
     new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(val)
+  
+  // Generar URL firmada para el documento (si existe)
+  let signedFileUrl = null
+  if (invoice.file_url) {
+    // Si la URL ya es http (ej: mock o pública), la usamos directo
+    if (invoice.file_url.startsWith('http')) {
+        signedFileUrl = invoice.file_url
+    } else {
+        // Si es un path relativo de storage, generamos URL firmada
+        const { data } = await supabase.storage
+            .from('invoices-docs')
+            .createSignedUrl(invoice.file_url, 3600) // 1 hora
+        
+        if (data?.signedUrl) {
+            signedFileUrl = data.signedUrl
+        }
+    }
+  }
 
   return (
     <div className="max-w-6xl mx-auto pb-12">
@@ -157,12 +175,24 @@ export default async function InvoiceDetailPage({
                     <h3 className="text-lg font-medium leading-6 text-gray-900">Documentos</h3>
                 </div>
                 <ul className="divide-y divide-gray-200">
-                    <li className="px-6 py-4 flex items-center justify-between hover:bg-gray-50">
+                    <li className="px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors">
                         <div className="flex items-center">
                             <FileText className="h-5 w-5 text-gray-400 mr-3" />
                             <span className="text-sm font-medium text-gray-900">Factura Original (XML/PDF)</span>
                         </div>
-                        <span className="text-sm text-gray-500">Ver documento</span>
+                        {signedFileUrl ? (
+                            <a 
+                                href={signedFileUrl} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="text-sm font-medium text-indigo-600 hover:text-indigo-800 hover:underline flex items-center"
+                            >
+                                Ver documento
+                                <span className="ml-1">↗</span>
+                            </a>
+                        ) : (
+                            <span className="text-sm text-gray-400 cursor-not-allowed">No disponible</span>
+                        )}
                     </li>
                     {/* Aquí se listarían más docs si hubiera */}
                 </ul>

@@ -1,8 +1,11 @@
 'use client'
 
-import { useTransition } from 'react'
+import { useTransition, useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { updateProfileAction } from '@/lib/actions/user'
 import { Loader2, User, Mail, Building, Lock } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
+import { useToast } from '@/components/ui/Toast'
 
 interface ProfileFormProps {
   user: {
@@ -15,14 +18,59 @@ interface ProfileFormProps {
 
 export function ProfileForm({ user }: ProfileFormProps) {
   const [isPending, startTransition] = useTransition()
+  const [fullName, setFullName] = useState(user.fullName)
+  const supabase = createClient()
+  const { toast } = useToast()
+  const router = useRouter()
+
+  // Sincronizar estado inicial si las props cambian (ej: navegación)
+  useEffect(() => {
+    setFullName(user.fullName)
+  }, [user.fullName])
+
+  // Suscripción Realtime a cambios en el perfil
+  useEffect(() => {
+    console.log('🔌 Suscribiendo a cambios de perfil para:', user.id)
+    
+    const channel = supabase
+      .channel('profile_realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'profiles',
+          filter: `id=eq.${user.id}`,
+        },
+        (payload) => {
+          const newData = payload.new as any
+          console.log('🔄 Cambio detectado en tiempo real:', newData)
+          
+          if (newData.full_name && newData.full_name !== fullName) {
+            setFullName(newData.full_name)
+            toast('Tu nombre ha sido actualizado remotamente', 'success')
+            router.refresh()
+          }
+        }
+      )
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          console.log('✅ Conectado a Supabase Realtime')
+        }
+      })
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [supabase, user.id, fullName, toast, router])
 
   const handleUpdate = async (formData: FormData) => {
     startTransition(async () => {
       const res = await updateProfileAction(formData)
       if (res?.error) {
-        alert(res.error)
+        toast(res.error, 'error')
       } else {
-        alert('Perfil actualizado correctamente')
+        toast('Perfil actualizado correctamente', 'success')
       }
     })
   }
@@ -51,7 +99,8 @@ export function ProfileForm({ user }: ProfileFormProps) {
                   type="text"
                   name="fullName"
                   id="fullName"
-                  defaultValue={user.fullName}
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
                   className="block w-full rounded-md border-0 py-1.5 pl-10 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-avalia-blue sm:text-sm sm:leading-6"
                 />
               </div>

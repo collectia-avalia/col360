@@ -142,6 +142,12 @@ export function PayersList({ payers }: { payers: Payer[] }) {
     }
   })
 
+  const totalConsumedQuota = processedPayers
+    .filter(p => p.risk_status === 'aprobado')
+    .reduce((sum, p) => sum + (p.stats.consumedQuota || 0), 0)
+
+  const consumedPercent = totalApprovedQuota > 0 ? Math.round((totalConsumedQuota / totalApprovedQuota) * 100) : 0
+
   // Filtrar
   const filteredPayers = processedPayers.filter(payer => {
     const matchesSearch = 
@@ -217,6 +223,7 @@ export function PayersList({ payers }: { payers: Payer[] }) {
                     <dl>
                         <dt className="text-sm font-medium text-gray-500 truncate">Cupo Total Aprobado</dt>
                         <dd className="text-2xl font-bold text-gray-900">{formatCurrency(totalApprovedQuota)}</dd>
+                        <dd className="text-sm text-gray-500">Consumido: {formatCurrency(totalConsumedQuota)} ({consumedPercent}%)</dd>
                     </dl>
                 </div>
             </div>

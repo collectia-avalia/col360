@@ -19,7 +19,14 @@ export default async function DashboardPage() {
     .eq('client_id', user.id)
     .order('created_at', { ascending: false })
 
+  const { data: payers } = await supabase
+    .from('payers')
+    .select('approved_quota')
+    .eq('created_by', user.id)
+    .eq('risk_status', 'aprobado')
+
   const allInvoices = invoices || []
+  const allPayers = payers || []
 
   // 2. Procesamiento de KPIs
   const getVisualStatus = (invoice: any) => {
@@ -37,6 +44,10 @@ export default async function DashboardPage() {
   const overdueAmount = overdueInvoices.reduce((sum, inv) => sum + (inv.amount || 0), 0)
   
   const coveragePercent = totalPortfolio > 0 ? Math.round((guaranteedAmount / totalPortfolio) * 100) : 0
+
+  // Calculation for Global Quota
+  const totalApprovedQuota = allPayers.reduce((sum, payer) => sum + (payer.approved_quota || 0), 0)
+  const availableQuota = Math.max(0, totalApprovedQuota - guaranteedAmount)
 
   // 3. Procesamiento para Gráficos
   
@@ -111,16 +122,18 @@ export default async function DashboardPage() {
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 mb-8">
           <KpiCard 
             title="Cupo Disponible Global" 
-            value={formatCurrency(150000000)} 
+            value={formatCurrency(availableQuota)} 
             icon={Wallet} 
             color="green"
-            trend={{ value: 0, label: 'Bolsa Adquirida: $500M', positive: true }}
+            trend={{ value: 0, label: `Bolsa Adquirida: ${formatCurrency(totalApprovedQuota)}`, positive: true }}
+            href="/dashboard/payers"
           />
            <KpiCard 
             title="Total Cartera Vigente" 
             value={formatCurrency(totalPortfolio - overdueAmount)} 
             icon={TrendingUp} 
             color="blue"
+            href="/dashboard/invoices?status=vigente"
           />
           <KpiCard 
             title="Cartera Vencida" 
@@ -128,6 +141,7 @@ export default async function DashboardPage() {
             icon={AlertCircle} 
             color="red"
             trend={{ value: overdueInvoices.length, label: 'facturas vencidas', positive: false }}
+            href="/dashboard/invoices?status=vencida"
           />
           <KpiCard 
             title="Cobertura Garantía" 
@@ -141,12 +155,14 @@ export default async function DashboardPage() {
             value={activeInvoices.length} 
             icon={FileText} 
             color="blue"
+            href="/dashboard/invoices"
           />
            <KpiCard 
             title="Total Recaudado" 
             value={formatCurrency(statusCounts.pagada * 1500000)} // Simulado
             icon={Wallet} 
             color="green"
+            href="/dashboard/invoices?status=pagada"
           />
         </div>
 
@@ -199,9 +215,15 @@ export default async function DashboardPage() {
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
                         {allInvoices.slice(0, 5).map((inv) => (
-                            <tr key={inv.id} className="hover:bg-gray-50 transition-colors">
+                            <tr 
+                                key={inv.id} 
+                                className="group hover:bg-gray-50 transition-colors cursor-pointer relative"
+                            >
                                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                    {inv.invoice_number}
+                                    <Link href={`/dashboard/invoices/${inv.id}`} className="absolute inset-0 z-10" aria-label={`Ver detalle de factura ${inv.invoice_number}`} />
+                                    <span className="relative z-0 group-hover:text-indigo-600 transition-colors">
+                                        {inv.invoice_number}
+                                    </span>
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                     {new Date(inv.issue_date).toLocaleDateString()}

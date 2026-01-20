@@ -161,8 +161,17 @@ export default function NewInvoiceForm({ payers }: { payers: PayerOption[] }) {
     setShowFields(true)
   }
 
+  const [successData, setSuccessData] = useState<{
+    message: string
+    invoiceNumber: string
+    amount: number
+    isGuaranteed: boolean
+    fileUrl: string
+  } | null>(null)
+
   const handleSubmit = (formData: FormData) => {
     setError(null)
+    setSuccessData(null)
     
     startTransition(async () => {
       const result = await createInvoiceAction(formData)
@@ -171,15 +180,88 @@ export default function NewInvoiceForm({ payers }: { payers: PayerOption[] }) {
         setError(result.error)
         toast(result.error, 'error')
       } else if (result?.success) {
+        setSuccessData({
+            message: result.message || 'Factura radicada correctamente',
+            invoiceNumber: formData.get('invoiceNumber') as string,
+            amount: parseFloat(formData.get('amount') as string),
+            isGuaranteed: result.isGuaranteed || false,
+            fileUrl: '' // No necesitamos la URL aquí para el comprobante simple
+        })
+        
         // Warning para garantía parcial
         if (result.warningMessage) {
-            toast(result.warningMessage, 'success') // Usamos success pero con mensaje de advertencia
+            toast(result.warningMessage, 'success')
         } else {
             toast(result.message || 'Factura radicada correctamente', 'success')
         }
-        router.push('/dashboard/invoices')
+        
+        // Scroll to top
+        window.scrollTo({ top: 0, behavior: 'smooth' })
       }
     })
+  }
+
+  if (successData) {
+      return (
+        <div className="max-w-2xl mx-auto bg-white rounded-xl shadow-lg border border-green-100 overflow-hidden animate-in fade-in zoom-in duration-300">
+            <div className="bg-green-50 p-8 text-center border-b border-green-100">
+                <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-green-100 mb-4">
+                    <ShieldCheck className="h-10 w-10 text-green-600" />
+                </div>
+                <h2 className="text-2xl font-bold text-gray-900">¡Factura Radicada Exitosamente!</h2>
+                <p className="mt-2 text-green-700">{successData.message}</p>
+            </div>
+            <div className="p-8 space-y-6">
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                        <p className="text-gray-500">Número de Factura</p>
+                        <p className="font-semibold text-gray-900 text-lg">{successData.invoiceNumber}</p>
+                    </div>
+                    <div className="text-right">
+                        <p className="text-gray-500">Monto Total</p>
+                        <p className="font-semibold text-gray-900 text-lg">
+                            {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP' }).format(successData.amount)}
+                        </p>
+                    </div>
+                </div>
+
+                <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                    <div className="flex items-center justify-between">
+                        <span className="text-gray-600 font-medium">Estado de Garantía</span>
+                        {successData.isGuaranteed ? (
+                            <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
+                                <ShieldCheck className="w-4 h-4 mr-1.5" />
+                                Garantizada
+                            </span>
+                        ) : (
+                            <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-800">
+                                Custodia Simple
+                            </span>
+                        )}
+                    </div>
+                </div>
+
+                <div className="flex gap-4 pt-4">
+                    <Link href="/dashboard/invoices" className="flex-1 text-center px-4 py-3 border border-gray-300 shadow-sm text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 transition-colors">
+                        Volver al Listado
+                    </Link>
+                    <button 
+                        onClick={() => {
+                            setSuccessData(null)
+                            setFileName(null)
+                            setParsedData(null)
+                            setShowFields(false)
+                            setIsPdf(false)
+                            setSelectedPayerId('')
+                        }}
+                        className="flex-1 text-center px-4 py-3 border border-transparent shadow-sm text-sm font-medium rounded-lg text-white bg-[#7c3aed] hover:bg-[#6d28d9] transition-colors"
+                    >
+                        Radicar Otra Factura
+                    </button>
+                </div>
+            </div>
+        </div>
+      )
   }
 
   return (
