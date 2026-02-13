@@ -16,6 +16,10 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Avalia SaaS - Infraestructura Digital para Financiación Inteligente",
   description: "Plataforma B2B para la gestión financiera y el análisis de riesgo crediticio. Digitaliza y agiliza la radicación de facturas y aprobación de cupos.",
+  icons: {
+    icon: "/favicon-avalia.png",
+    apple: "/favicon-avalia.png",
+  },
   openGraph: {
     title: "Avalia SaaS - Infraestructura Digital para Financiación Inteligente",
     description: "Plataforma B2B para la gestión financiera y el análisis de riesgo crediticio.",
