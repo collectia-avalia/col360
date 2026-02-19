@@ -1,12 +1,13 @@
 'use server'
 
+import React from 'react'
+
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { z } from 'zod'
-import { Resend } from 'resend'
-
-const resend = new Resend(process.env.RESEND_API_KEY)
+import { sendEmail } from '@/lib/actions/email'
+import { InvoiceEmail } from '@/components/emails/InvoiceEmail'
 
 const invoiceSchema = z.object({
   invoiceNumber: z.string().min(1),
@@ -74,25 +75,25 @@ export async function createInvoiceAction(formData: FormData) {
   let warningMessage = null
 
   if (wantsGuarantee && payer.risk_status === 'aprobado') {
-      if (availableQuota >= numericAmount) {
-          // Caso A: Cupo Total
-          isGuaranteed = true
-          guaranteedAmount = numericAmount
-      } else if (availableQuota > 0) {
-          // Caso B: Garantía Parcial
-          isGuaranteed = true
-          guaranteedAmount = availableQuota
-          
-          const formatter = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 })
-          warningMessage = `Factura parcialmente garantizada por límite de cupo (${formatter.format(guaranteedAmount)} de ${formatter.format(numericAmount)})`
-      } else {
-          // Caso C: Sin Cupo
-          isGuaranteed = false
-          guaranteedAmount = 0
-          warningMessage = "Sin cupo disponible. Factura radicada en Custodia."
-      }
+    if (availableQuota >= numericAmount) {
+      // Caso A: Cupo Total
+      isGuaranteed = true
+      guaranteedAmount = numericAmount
+    } else if (availableQuota > 0) {
+      // Caso B: Garantía Parcial
+      isGuaranteed = true
+      guaranteedAmount = availableQuota
+
+      const formatter = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 })
+      warningMessage = `Factura parcialmente garantizada por límite de cupo (${formatter.format(guaranteedAmount)} de ${formatter.format(numericAmount)})`
+    } else {
+      // Caso C: Sin Cupo
+      isGuaranteed = false
+      guaranteedAmount = 0
+      warningMessage = "Sin cupo disponible. Factura radicada en Custodia."
+    }
   } else if (wantsGuarantee && payer.risk_status !== 'aprobado') {
-      warningMessage = "El pagador no está aprobado para garantías. Factura radicada en Custodia."
+    warningMessage = "El pagador no está aprobado para garantías. Factura radicada en Custodia."
   }
 
   // 3. Subir Archivo
@@ -111,11 +112,11 @@ export async function createInvoiceAction(formData: FormData) {
       console.error('Error subiendo factura:', uploadError)
       return { error: 'Error subiendo el archivo de la factura' }
     }
-    
+
     // Construir URL pública o privada (en este caso guardamos el path)
     fileUrl = filePath
   } else {
-      return { error: 'Debes subir el archivo de la factura (PDF/XML)' }
+    return { error: 'Debes subir el archivo de la factura (PDF/XML)' }
   }
 
   // 4. Guardar Factura
@@ -147,12 +148,12 @@ export async function createInvoiceAction(formData: FormData) {
 
   // Retornamos el estado para mostrar feedback en el cliente
   revalidatePath('/dashboard/invoices')
-  
-  return { 
-      success: true, 
-      message: warningMessage || (isGuaranteed ? "Factura radicada y garantizada exitosamente." : "Factura radicada correctamente."),
-      isGuaranteed,
-      warningMessage
+
+  return {
+    success: true,
+    message: warningMessage || (isGuaranteed ? "Factura radicada y garantizada exitosamente." : "Factura radicada correctamente."),
+    isGuaranteed,
+    warningMessage
   }
 }
 
@@ -177,29 +178,56 @@ export async function toggleInvoiceStatus(invoiceId: string, newStatus: string) 
 }
 
 export async function sendInvoiceEmailAction(invoiceId: string, email: string, subject: string, body: string) {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return { error: 'No autorizado' }
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'No autorizado' }
 
-    try {
-        const { data, error } = await resend.emails.send({
-            from: 'Avalia SaaS <onboarding@resend.dev>',
-            to: [email],
-            subject: subject,
-            text: body,
-        })
+  // Consultar detalles de la factura para la plantilla
+  const { data: invoice } = await supabase
+    .from('invoices')
+    .select(`
+            invoice_number,
+            amount,
+            due_date,
+            payers (
+                social_reason
+            )
+        `)
+    .eq('id', invoiceId)
+    .single()
 
-        if (error) {
-            console.error('Error enviando email:', error)
-            return { error: 'Error enviando el correo: ' + error.message }
-        }
+  const payerData = invoice?.payers as any
+  const payerName = payerData?.social_reason || (Array.isArray(payerData) && payerData[0]?.social_reason) || 'Cliente'
+  const invoiceNumber = invoice?.invoice_number || 'N/A'
+  const formattedAmount = invoice?.amount
+    ? new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(invoice.amount)
+    : '$ 0'
+  const dueDate = invoice?.due_date || 'N/A'
 
-        console.log(`[AUDIT] Email enviado por ${user.email} para factura ${invoiceId} a ${email} | ID Resend: ${data?.id}`)
-        
-        return { success: true }
+  try {
+    const result = await sendEmail({
+      to: email,
+      subject: subject,
+      react: InvoiceEmail({
+        invoiceNumber,
+        amount: formattedAmount,
+        dueDate,
+        payerName,
+        message: body
+      }) as React.ReactElement
+    })
 
-    } catch (err) {
-        console.error('Excepción enviando email:', err)
-        return { error: 'Error inesperado al enviar correo' }
+    if (!result.success) {
+      console.error('Error enviando email:', result.error)
+      return { error: 'Error enviando el correo: ' + result.error }
     }
+
+    console.log(`[AUDIT] Email enviado por ${user.email} para factura ${invoiceId} a ${email}`)
+
+    return { success: true }
+
+  } catch (err) {
+    console.error('Excepción enviando email:', err)
+    return { error: 'Error inesperado al enviar correo' }
+  }
 }

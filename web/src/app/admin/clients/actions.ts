@@ -4,6 +4,9 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { z } from 'zod'
+import { sendEmail } from '@/lib/actions/email'
+import WelcomeClientEmail from '@/components/emails/WelcomeClientEmail'
+import React from 'react'
 
 const createClientSchema = z.object({
   companyName: z.string().min(3, 'El nombre debe tener al menos 3 caracteres'),
@@ -61,6 +64,34 @@ export async function createClientAction(formData: FormData) {
   // En el prompt FASE 0, 'profiles' NO tiene NIT. 'payers' SÍ.
   // Sin embargo, es lógico que el Cliente (Empresa usuaria del SaaS) tenga NIT.
   // Si no está en la tabla, no podemos guardarlo. Lo dejaremos en user_metadata.
+
+  // 3. Enviar Correo de Bienvenida con Credenciales
+  // Construir la URL base dinámicamente o desde variables de entorno
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000'
+  const loginUrl = `${baseUrl}/login`
+
+  try {
+    const result = await sendEmail({
+      to: email,
+      subject: 'Bienvenido a Avalia SaaS - Credenciales de Acceso',
+      react: WelcomeClientEmail({
+        companyName: companyName,
+        email: email,
+        loginUrl: loginUrl,
+        password: password // NOTA: En producción idealmente enviaríamos un link de activación/reset password
+      }) as React.ReactElement
+    })
+
+    if (!result.success) {
+      console.error('Error enviando email de bienvenida:', result.error)
+      // No fallamos la creación del usuario, pero logueamos el error
+    } else {
+      console.log(`[AUDIT] Email de bienvenida enviado a ${email}`)
+    }
+
+  } catch (err) {
+    console.error('Excepción enviando email de bienvenida:', err)
+  }
 
   revalidatePath('/admin/clients')
   redirect('/admin/clients')

@@ -1,12 +1,14 @@
 'use server'
 
+import React from 'react'
+
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { z } from 'zod'
-import { Resend } from 'resend'
-
-const resend = new Resend(process.env.RESEND_API_KEY)
+import { sendEmail } from '@/lib/actions/email'
+import InvitePayerEmail from '@/components/emails/InvitePayerEmail'
+import ConfirmPayerCreationEmail from '@/components/emails/ConfirmPayerCreationEmail'
 
 const payerSchema = z.object({
   razonSocial: z.string().min(3),
@@ -65,40 +67,56 @@ export async function createPayerAction(formData: FormData) {
   if (payerError) {
     console.error('Error creando pagador:', payerError)
     if (payerError.message.includes('column "invitation_status" of relation "payers" does not exist')) {
-         return { error: 'Error de base de datos: Faltan migraciones (invitation_status). Contacte soporte.' }
+      return { error: 'Error de base de datos: Faltan migraciones (invitation_status). Contacte soporte.' }
     }
     return { error: 'Error al guardar el pagador: ' + payerError.message }
   }
 
   // 3. Enviar Correo con Resend
+  // Construir la URL base dinámicamente o desde variables de entorno
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000'
+  const inviteLink = `${baseUrl}/invite/${invitationToken}`
+
   try {
-    const { data, error: emailError } = await resend.emails.send({
-        from: 'Avalia SaaS <onboarding@resend.dev>', // Usar dominio verificado en Prod
-        to: [contactEmail],
-        subject: 'Invitación al Portal de Pagos - Avalia',
-        html: `
-            <div style="font-family: sans-serif; max-w-600px; margin: 0 auto;">
-                <h2 style="color: #7c3aed;">Bienvenido a Avalia</h2>
-                <p>Hola <strong>${razonSocial}</strong>,</p>
-                <p><strong>${user.email}</strong> te ha invitado a gestionar tus facturas y cupos en nuestra plataforma.</p>
-                <p>Para completar tu registro y acceder al portal, por favor haz clic en el siguiente enlace:</p>
-                <div style="margin: 24px 0;">
-                    <a href="http://localhost:3000/invite/${invitationToken}" style="background-color: #7c3aed; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">
-                        Aceptar Invitación
-                    </a>
-                </div>
-                <p style="color: #666; font-size: 14px;">Si no esperabas este correo, puedes ignorarlo.</p>
-                <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;" />
-                <p style="color: #999; font-size: 12px;">© 2024 Avalia SaaS. Todos los derechos reservados.</p>
-            </div>
-        `
+    const result = await sendEmail({
+      to: contactEmail,
+      subject: 'Invitación al Portal de Pagos - Avalia',
+      react: InvitePayerEmail({
+        razonSocial: razonSocial,
+        inviterEmail: user.email || 'Un usuario de Avalia',
+        inviteLink: inviteLink
+      }) as React.ReactElement
     })
 
-    if (emailError) {
-        console.error('Error enviando email (Resend):', emailError)
+    if (!result.success) {
+      console.error('Error enviando email de invitación:', result.error)
+      // No fallamos la request completa, pero logueamos el error
+    } else {
+      console.log(`[AUDIT] Invitación enviada a ${contactEmail} por ${user.email}`)
     }
+
   } catch (err) {
-      console.error('Excepción enviando email:', err)
+    console.error('Excepción enviando email de invitación:', err)
+  }
+
+  // 4. Enviar Correo de Confirmación al Usuario (Cliente)
+  // Este correo le avisa al usuario que el proceso de registro del pagador inició correctamente.
+  if (user.email) {
+    try {
+      await sendEmail({
+        to: user.email,
+        subject: 'Confirmación de Registro de Pagador - Avalia SaaS',
+        react: ConfirmPayerCreationEmail({
+          payerName: razonSocial,
+          payerEmail: contactEmail,
+          userName: user.email
+        }) as React.ReactElement
+      })
+      console.log(`[AUDIT] Email de confirmación enviado al usuario ${user.email}`)
+    } catch (err) {
+      console.error('Error enviando email de confirmación al usuario:', err)
+      // No bloqueamos el flujo principal si este correo falla
+    }
   }
 
   revalidatePath('/dashboard/payers')
@@ -118,12 +136,12 @@ export async function deletePayerAction(payerId: string) {
     .eq('payer_id', payerId)
 
   if (countError) {
-      console.error('Error checking invoices:', countError)
-      return { error: 'Error verificando facturas del cliente' }
+    console.error('Error checking invoices:', countError)
+    return { error: 'Error verificando facturas del cliente' }
   }
 
   if (count && count > 0) {
-      return { error: 'No se puede eliminar el cliente porque tiene facturas asociadas. Elimina las facturas primero.' }
+    return { error: 'No se puede eliminar el cliente porque tiene facturas asociadas. Elimina las facturas primero.' }
   }
 
   const { error } = await supabase
@@ -161,8 +179,8 @@ export async function updatePayerAction(formData: FormData) {
   const validatedFields = UpdatePayerSchema.safeParse(rawFormData)
 
   if (!validatedFields.success) {
-      console.error("❌ Zod Error Detallado:", validatedFields.error.flatten().fieldErrors);
-      return { error: 'Datos inválidos (Revisa consola del servidor)' }
+    console.error("❌ Zod Error Detallado:", validatedFields.error.flatten().fieldErrors);
+    return { error: 'Datos inválidos (Revisa consola del servidor)' }
   }
 
   const { id, ...dataToUpdate } = validatedFields.data
@@ -174,8 +192,8 @@ export async function updatePayerAction(formData: FormData) {
     .eq('created_by', user.id)
 
   if (error) {
-      console.error('Error updating payer:', error)
-      return { error: 'Error actualizando el cliente' }
+    console.error('Error updating payer:', error)
+    return { error: 'Error actualizando el cliente' }
   }
 
   revalidatePath('/dashboard/payers')
