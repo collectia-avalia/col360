@@ -13,13 +13,14 @@ import ConfirmPayerCreationEmail from '@/components/emails/ConfirmPayerCreationE
 const payerSchema = z.object({
   razonSocial: z.string().min(3),
   contactEmail: z.string().email(),
+  nit: z.string().optional(),
   authContact: z.literal('on'),
 })
 
-// Esquema de validación para edición
+// Esquema de validacion para edicion
 const UpdatePayerSchema = z.object({
   id: z.string().uuid(),
-  razon_social: z.string().min(1, "La razón social es obligatoria"),
+  razon_social: z.string().min(1, "La razon social es obligatoria"),
   contact_email: z.string().email().optional(),
 })
 
@@ -31,96 +32,98 @@ export async function createPayerAction(formData: FormData) {
     return { error: 'No autorizado' }
   }
 
-  // 1. Validar Datos Básicos
+  // 1. Validar Datos Basicos
   const rawData = {
     razonSocial: formData.get('razonSocial'),
     contactEmail: formData.get('contactEmail'),
+    nit: formData.get('nit') || undefined,
     authContact: formData.get('auth_contact'),
   }
 
   const validation = payerSchema.safeParse(rawData)
 
   if (!validation.success) {
-    return { error: 'Datos inválidos', details: validation.error.flatten().fieldErrors }
+    return { error: 'Datos invalidos', details: validation.error.flatten().fieldErrors }
   }
 
-  const { razonSocial, contactEmail } = validation.data
+  const { razonSocial, contactEmail, nit } = validation.data
 
-  const tempNit = `PENDING-${Date.now()}`
+  const finalNit = nit || `PENDING-${Date.now()}`
   const invitationToken = crypto.randomUUID()
 
+  // INSERTAR EN TABLA PAYERS (Sin crear usuario en Auth)
   const { data: payer, error: payerError } = await supabase
     .from('payers')
     .insert({
       razon_social: razonSocial,
-      nit: tempNit, // Placeholder
+      nit: finalNit,
       contact_email: contactEmail,
       created_by: user.id,
       risk_status: 'pendiente',
       invitation_status: 'sent',
       invitation_token: invitationToken,
-      terms_accepted: true // El cliente aceptó por el pagador inicial
+      terms_accepted: true
     })
     .select()
     .single()
 
   if (payerError) {
     console.error('Error creando pagador:', payerError)
-    if (payerError.message.includes('column "invitation_status" of relation "payers" does not exist')) {
-      return { error: 'Error de base de datos: Faltan migraciones (invitation_status). Contacte soporte.' }
-    }
     return { error: 'Error al guardar el pagador: ' + payerError.message }
   }
 
-  // 3. Enviar Correo con Resend
-  // Construir la URL base dinámicamente o desde variables de entorno
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000'
-  const inviteLink = `${baseUrl}/invite/${invitationToken}`
+  // Construir URL del formulario directo
+  let baseUrl = 'http://localhost:3000'
+  if (process.env.NEXT_PUBLIC_APP_URL) {
+    baseUrl = process.env.NEXT_PUBLIC_APP_URL
+  } else if (process.env.VERCEL_URL) {
+    baseUrl = `https://${process.env.VERCEL_URL}`
+  }
 
+  const formularioLink = `${baseUrl}/formulario/${invitationToken}`
+
+  // Enviar correo con link directo al formulario
   try {
     const result = await sendEmail({
       to: contactEmail,
-      subject: 'Invitación al Portal de Pagos - Avalia',
+      subject: 'Completa tu Estudio de Credito - Avalia',
       react: InvitePayerEmail({
         razonSocial: razonSocial,
-        inviterEmail: user.email || 'Un usuario de Avalia',
-        inviteLink: inviteLink
+        inviterEmail: user.email || 'Avalia',
+        inviteLink: formularioLink,
       }) as React.ReactElement
     })
 
     if (!result.success) {
-      console.error('Error enviando email de invitación:', result.error)
-      // No fallamos la request completa, pero logueamos el error
+      console.error('Error enviando email de invitacion:', result.error)
     } else {
-      console.log(`[AUDIT] Invitación enviada a ${contactEmail} por ${user.email}`)
+      console.log(`[AUDIT] Invitacion enviada a ${contactEmail}`)
     }
 
   } catch (err) {
-    console.error('Excepción enviando email de invitación:', err)
+    console.error('Excepcion enviando email de invitacion:', err)
   }
 
-  // 4. Enviar Correo de Confirmación al Usuario (Cliente)
-  // Este correo le avisa al usuario que el proceso de registro del pagador inició correctamente.
+  // Enviar correo de confirmacion al admin
   if (user.email) {
     try {
       await sendEmail({
         to: user.email,
-        subject: 'Confirmación de Registro de Pagador - Avalia SaaS',
+        subject: 'Confirmacion de Registro de Pagador - Avalia SaaS',
         react: ConfirmPayerCreationEmail({
           payerName: razonSocial,
           payerEmail: contactEmail,
           userName: user.email
         }) as React.ReactElement
       })
-      console.log(`[AUDIT] Email de confirmación enviado al usuario ${user.email}`)
+      console.log(`[AUDIT] Email de confirmacion enviado al usuario ${user.email}`)
     } catch (err) {
-      console.error('Error enviando email de confirmación al usuario:', err)
-      // No bloqueamos el flujo principal si este correo falla
+      console.error('Error enviando email de confirmacion al usuario:', err)
     }
   }
 
   revalidatePath('/dashboard/payers')
-  return { success: true, message: `Invitación enviada correctamente a ${contactEmail}` }
+  return { success: true, message: `Invitacion enviada correctamente a ${contactEmail}` }
 }
 
 export async function deletePayerAction(payerId: string) {
@@ -129,14 +132,13 @@ export async function deletePayerAction(payerId: string) {
 
   if (!user) return { error: 'No autorizado' }
 
-  // Check if invoices exist
   const { count, error: countError } = await supabase
     .from('invoices')
     .select('*', { count: 'exact', head: true })
     .eq('payer_id', payerId)
 
   if (countError) {
-    console.error('Error checking invoices:', countError)
+    console.error('Error verificando facturas:', countError)
     return { error: 'Error verificando facturas del cliente' }
   }
 
@@ -151,7 +153,7 @@ export async function deletePayerAction(payerId: string) {
     .eq('created_by', user.id)
 
   if (error) {
-    console.error('Error deleting payer:', error)
+    console.error('Error eliminando pagador:', error)
     return { error: 'Error eliminando el cliente' }
   }
 
@@ -165,22 +167,19 @@ export async function updatePayerAction(formData: FormData) {
 
   if (!user) return { error: 'No autorizado' }
 
-  // 1. LIMPIEZA DE DATOS (Vital para evitar el error de NULL)
   const rawFormData = {
     id: formData.get('id')?.toString(),
     razon_social: formData.get('razon_social')?.toString(),
-    // El truco: Si es null o vacío, enviamos undefined para que Zod lo acepte como opcional
     contact_name: formData.get('contact_name')?.toString() || undefined,
     contact_phone: formData.get('contact_phone')?.toString() || undefined,
     contact_email: formData.get('contact_email')?.toString() || undefined,
   }
 
-  // 2. VALIDAR CON ZOD
   const validatedFields = UpdatePayerSchema.safeParse(rawFormData)
 
   if (!validatedFields.success) {
-    console.error("❌ Zod Error Detallado:", validatedFields.error.flatten().fieldErrors);
-    return { error: 'Datos inválidos (Revisa consola del servidor)' }
+    console.error("Error de validacion Zod:", validatedFields.error.flatten().fieldErrors);
+    return { error: 'Datos invalidos (Revisa consola del servidor)' }
   }
 
   const { id, ...dataToUpdate } = validatedFields.data
@@ -192,7 +191,7 @@ export async function updatePayerAction(formData: FormData) {
     .eq('created_by', user.id)
 
   if (error) {
-    console.error('Error updating payer:', error)
+    console.error('Error actualizando pagador:', error)
     return { error: 'Error actualizando el cliente' }
   }
 

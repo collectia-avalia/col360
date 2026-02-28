@@ -13,6 +13,7 @@ const createClientSchema = z.object({
   nit: z.string().min(5, 'El NIT debe ser válido'),
   email: z.string().email('Email inválido'),
   password: z.string().min(6, 'La contraseña debe tener al menos 6 caracteres'),
+  totalBag: z.coerce.number().min(0, 'El valor de la bolsa debe ser positivo'),
 })
 
 export async function createClientAction(formData: FormData) {
@@ -23,6 +24,7 @@ export async function createClientAction(formData: FormData) {
     nit: formData.get('nit'),
     email: formData.get('email'),
     password: formData.get('password'),
+    totalBag: formData.get('totalBag'),
   }
 
   const validation = createClientSchema.safeParse(rawData)
@@ -31,7 +33,7 @@ export async function createClientAction(formData: FormData) {
     return { error: validation.error.flatten().fieldErrors }
   }
 
-  const { email, password, companyName, nit } = validation.data
+  const { email, password, companyName, nit, totalBag } = validation.data
 
   // 1. Crear usuario en Auth
   const { data: user, error: authError } = await adminSupabase.auth.admin.createUser({
@@ -41,6 +43,7 @@ export async function createClientAction(formData: FormData) {
     user_metadata: {
       company_name: companyName,
       nit: nit,
+      total_bag: totalBag,
       role: 'client' // Aunque el trigger lo pone por defecto, aseguramos metadata
     }
   })

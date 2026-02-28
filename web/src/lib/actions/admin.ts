@@ -6,36 +6,37 @@ import { revalidatePath } from 'next/cache'
 // --- GESTIÓN DE CLIENTES ---
 
 export async function deleteClientAction(userId: string) {
-  const supabase = createAdminClient()
+    const supabase = createAdminClient()
 
-  try {
-    const { error: authError } = await supabase.auth.admin.deleteUser(userId)
-    
-    if (authError) {
-      console.error('Error eliminando usuario de Auth:', authError)
-      return { error: 'Error al eliminar usuario del sistema de autenticación.' }
+    try {
+        const { error: authError } = await supabase.auth.admin.deleteUser(userId)
+
+        if (authError) {
+            console.error('Error eliminando usuario de Auth:', authError)
+            return { error: 'Error al eliminar usuario del sistema de autenticación.' }
+        }
+
+        const { error: profileError } = await supabase
+            .from('profiles')
+            .delete()
+            .eq('id', userId)
+
+        if (profileError) {
+            console.warn('Advertencia: Error borrando perfil:', profileError)
+        }
+
+        revalidatePath('/admin/clients')
+        return { success: true }
+    } catch {
+        return { error: 'Error inesperado al procesar la solicitud.' }
     }
-
-    const { error: profileError } = await supabase
-        .from('profiles')
-        .delete()
-        .eq('id', userId)
-    
-    if (profileError) {
-        console.warn('Advertencia: Error borrando perfil:', profileError)
-    }
-
-    revalidatePath('/admin/clients')
-    return { success: true }
-  } catch {
-    return { error: 'Error inesperado al procesar la solicitud.' }
-  }
 }
 
 export async function updateClientAction(userId: string, formData: FormData) {
     const supabase = createAdminClient()
     const companyName = formData.get('companyName') as string
     const email = formData.get('email') as string
+    const totalBag = Number(formData.get('totalBag'))
 
     try {
         // 1. Actualizar Auth (Email) si cambió
@@ -50,9 +51,13 @@ export async function updateClientAction(userId: string, formData: FormData) {
         // 2. Actualizar Profile
         const { error: profileError } = await supabase
             .from('profiles')
-            .update({ company_name: companyName, email: email }) // Sincronizamos email en profile
+            .update({
+                company_name: companyName,
+                email: email,
+                total_bag: totalBag
+            }) // Sincronizamos email y bolsa en profile
             .eq('id', userId)
-        
+
         if (profileError) throw new Error('Error actualizando perfil: ' + profileError.message)
 
         revalidatePath('/admin/clients')
@@ -77,7 +82,7 @@ export async function approvePayerAction(payerId: string, amount: number) {
                 approved_quota: amount
             })
             .eq('id', payerId)
-        
+
         if (error) throw new Error(error.message)
 
         revalidatePath('/admin/approvals')
@@ -104,7 +109,7 @@ export async function rejectPayerAction(payerId: string, reason: string) {
                 approved_quota: 0
             })
             .eq('id', payerId)
-        
+
         if (error) throw new Error(error.message)
 
         revalidatePath('/admin/approvals')

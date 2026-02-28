@@ -4,7 +4,7 @@ import { createClientAction } from '../actions'
 import { useFormStatus } from 'react-dom'
 import { useState } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, Loader2, Building, Mail, Lock, FileText } from 'lucide-react'
+import { ArrowLeft, Loader2, Building, Mail, Lock, FileText, Wallet } from 'lucide-react'
 
 function SubmitButton() {
   const { pending } = useFormStatus()
@@ -33,6 +33,7 @@ export default function NewClientPage() {
     nit?: string[]
     email?: string[]
     password?: string[]
+    totalBag?: string[]
     root?: string[]
   } | null>(null)
 
@@ -107,42 +108,67 @@ export default function NewClientPage() {
               )}
             </div>
 
+            {/* Valor de la Bolsa */}
+            <div>
+              <label htmlFor="totalBag" className="block text-sm font-medium text-gray-700">
+                Valor de la Bolsa (Cupo Global)
+              </label>
+              <div className="mt-1 relative rounded-md shadow-sm">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Wallet className="h-5 w-5 text-gray-400" aria-hidden="true" />
+                </div>
+                <input
+                  type="number"
+                  name="totalBag"
+                  id="totalBag"
+                  required
+                  min="0"
+                  step="0.01"
+                  className="focus:ring-indigo-500 focus:border-indigo-500 block w-full pl-10 sm:text-sm border-gray-300 rounded-md py-2 border"
+                  placeholder="Ej: 15000000"
+                />
+              </div>
+              {serverError?.totalBag && (
+                <p className="mt-1 text-sm text-red-600">{serverError.totalBag[0]}</p>
+              )}
+            </div>
+
             <div className="border-t border-gray-200 pt-6">
-                <h3 className="text-sm font-medium text-gray-900 mb-4">Credenciales de Acceso</h3>
-                
-                {/* Email */}
-                <div className="mb-4">
+              <h3 className="text-sm font-medium text-gray-900 mb-4">Credenciales de Acceso</h3>
+
+              {/* Email */}
+              <div className="mb-4">
                 <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                    Correo Electrónico (Usuario)
+                  Correo Electrónico (Usuario)
                 </label>
                 <div className="mt-1 relative rounded-md shadow-sm">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                     <Mail className="h-5 w-5 text-gray-400" aria-hidden="true" />
-                    </div>
-                    <input
+                  </div>
+                  <input
                     type="email"
                     name="email"
                     id="email"
                     required
                     className="focus:ring-indigo-500 focus:border-indigo-500 block w-full pl-10 sm:text-sm border-gray-300 rounded-md py-2 border"
                     placeholder="usuario@empresa.com"
-                    />
+                  />
                 </div>
                 {serverError?.email && (
-                    <p className="mt-1 text-sm text-red-600">{serverError.email}</p>
+                  <p className="mt-1 text-sm text-red-600">{serverError.email}</p>
                 )}
-                </div>
+              </div>
 
-                {/* Password */}
-                <div>
+              {/* Password */}
+              <div>
                 <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-                    Contraseña Temporal
+                  Contraseña Temporal
                 </label>
                 <div className="mt-1 relative rounded-md shadow-sm">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                     <Lock className="h-5 w-5 text-gray-400" aria-hidden="true" />
-                    </div>
-                    <input
+                  </div>
+                  <input
                     type="text"
                     name="password"
                     id="password"
@@ -150,13 +176,13 @@ export default function NewClientPage() {
                     defaultValue="Avalia2025."
                     className="focus:ring-indigo-500 focus:border-indigo-500 block w-full pl-10 sm:text-sm border-gray-300 rounded-md py-2 border"
                     placeholder="Mínimo 6 caracteres"
-                    />
+                  />
                 </div>
                 <p className="mt-1 text-xs text-gray-500">Puedes asignar una por defecto o escribir una personalizada.</p>
                 {serverError?.password && (
-                    <p className="mt-1 text-sm text-red-600">{serverError.password}</p>
+                  <p className="mt-1 text-sm text-red-600">{serverError.password}</p>
                 )}
-                </div>
+              </div>
             </div>
 
             {serverError?.root && (

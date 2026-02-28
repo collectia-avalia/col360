@@ -11,7 +11,7 @@ export default async function ClientsPage() {
   const { data: clients, error } = await supabase
     .from('profiles')
     .select('*')
-    .eq('role', 'client') 
+    .eq('role', 'client')
     .order('created_at', { ascending: false })
 
   if (error) {
@@ -48,6 +48,9 @@ export default async function ClientsPage() {
                 Estado
               </th>
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Bolsa Asignada
+              </th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Fecha Registro
               </th>
               <th scope="col" className="relative px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -80,6 +83,9 @@ export default async function ClientsPage() {
                     <CheckCircle className="w-3 h-3 mr-1" /> Activo
                   </span>
                 </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">
+                  {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(client.total_bag || 0)}
+                </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                   {new Date(client.created_at).toLocaleDateString()}
                 </td>
@@ -89,11 +95,11 @@ export default async function ClientsPage() {
               </tr>
             ))}
             {(!clients || clients.length === 0) && (
-                <tr>
-                    <td colSpan={5} className="px-6 py-12 text-center text-gray-500">
-                        No hay clientes registrados aún.
-                    </td>
-                </tr>
+              <tr>
+                <td colSpan={5} className="px-6 py-12 text-center text-gray-500">
+                  No hay clientes registrados aún.
+                </td>
+              </tr>
             )}
           </tbody>
         </table>

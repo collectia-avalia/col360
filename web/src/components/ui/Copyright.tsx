@@ -17,8 +17,10 @@ import React from 'react'
 
 export function Copyright({ className = "" }: { className?: string }) {
   return (
-    <div className={`text-center text-xs text-slate-400 ${className}`}>
-        &copy; 2026 AvalIA SaaS. Diseño y Desarrollo por Gustavo Vargas - <a href="https://iango.dev" target="_blank" rel="noopener noreferrer" className="hover:text-avalia-blue transition-colors font-medium">iAnGo Desarrollo e Implementaciones con IA</a>
+    <div className={`text-center py-4 ${className}`}>
+      <p className="text-[10px] text-slate-400 font-medium tracking-wide uppercase">
+        &copy; {new Date().getFullYear()} AvalIA SaaS &bull; iAnGo | Agencia de Desarrollo y Soluciones con IA &bull; Gustavo Vargas
+      </p>
     </div>
   )
 }

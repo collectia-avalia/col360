@@ -10,6 +10,7 @@ interface ClientData {
   id: string
   company_name: string | null
   email: string | null
+  total_bag?: number | null
 }
 
 export default function EditClientForm({ client }: { client: ClientData }) {
@@ -33,7 +34,7 @@ export default function EditClientForm({ client }: { client: ClientData }) {
   return (
     <form action={handleSubmit} className="bg-white shadow sm:rounded-lg border border-gray-200 p-6 max-w-2xl">
       <div className="grid grid-cols-1 gap-y-6 gap-x-4">
-        
+
         {/* Razón Social */}
         <div>
           <label htmlFor="companyName" className="block text-sm font-medium text-gray-700">Razón Social / Empresa</label>
@@ -66,6 +67,23 @@ export default function EditClientForm({ client }: { client: ClientData }) {
           <p className="mt-1 text-xs text-gray-500">
             El correo electrónico no se puede modificar por seguridad. Contacte a soporte si requiere cambios.
           </p>
+        </div>
+        {/* Valor de la Bolsa */}
+        <div>
+          <label htmlFor="totalBag" className="block text-sm font-medium text-gray-700">Valor de la Bolsa (Cupo Global)</label>
+          <div className="mt-1">
+            <input
+              type="number"
+              name="totalBag"
+              id="totalBag"
+              defaultValue={client.total_bag || 0}
+              min="0"
+              step="0.01"
+              className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md py-2 px-3 border"
+              placeholder="Ej: 15000000"
+              required
+            />
+          </div>
         </div>
 
       </div>

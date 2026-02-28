@@ -22,7 +22,7 @@ export const InvitePayerEmail: React.FC<InvitePayerEmailProps> = ({
     };
 
     const headerStyle = {
-        backgroundColor: '#7c3aed', // Violet-600 (Avalia Brand Color?)
+        backgroundColor: '#7c3aed',
         color: '#ffffff',
         padding: '20px',
         textAlign: 'center' as const,
@@ -61,24 +61,24 @@ export const InvitePayerEmail: React.FC<InvitePayerEmailProps> = ({
         <div style={containerStyle}>
             <div style={headerStyle}>
                 <h1 style={{ margin: 0, fontSize: '24px' }}>Bienvenido a Avalia</h1>
-                <p style={{ margin: '5px 0 0', fontSize: '14px', opacity: 0.9 }}>Invitación al Portal de Pagos</p>
+                <p style={{ margin: '5px 0 0', fontSize: '14px', opacity: 0.9 }}>Estudio de Credito</p>
             </div>
 
             <div style={bodyStyle}>
                 <p>Hola <strong>{razonSocial}</strong>,</p>
 
-                <p><strong>{inviterEmail}</strong> te ha invitado a gestionar tus facturas y cupos en nuestra plataforma Avalia SaaS.</p>
+                <p><strong>{inviterEmail}</strong> te ha invitado a completar tu estudio de credito en nuestra plataforma Avalia SaaS.</p>
 
-                <p>Para completar tu registro, configurar tu cuenta y acceder al portal, por favor haz clic en el siguiente botón:</p>
+                <p>Para continuar, haz clic en el siguiente boton. No necesitas crear una cuenta ni una contrasena, el acceso es directo y seguro.</p>
 
                 <div style={{ textAlign: 'center' }}>
                     <a href={inviteLink} style={buttonStyle}>
-                        Aceptar Invitación
+                        Completar Estudio de Credito
                     </a>
                 </div>
 
                 <p style={{ fontSize: '14px', color: '#666' }}>
-                    Si el botón no funciona, copia y pega el siguiente enlace en tu navegador:
+                    Si el boton no funciona, copia y pega el siguiente enlace en tu navegador:
                     <br />
                     <a href={inviteLink} style={{ color: '#7c3aed' }}>{inviteLink}</a>
                 </p>
@@ -89,8 +89,7 @@ export const InvitePayerEmail: React.FC<InvitePayerEmailProps> = ({
             </div>
 
             <div style={footerStyle}>
-                <p>© {new Date().getFullYear()} Avalia SaaS. Todos los derechos reservados.</p>
-                <p>Este es un correo automático, por favor no respondas a esta dirección.</p>
+                <p>&copy; {new Date().getFullYear()} AvalIA SaaS &bull; iAnGo | Agencia de Desarrollo y Soluciones con IA &bull; Gustavo Vargas</p>
             </div>
         </div>
     );

@@ -12,7 +12,12 @@ export default async function DashboardPage() {
 
   if (!user) return <div className="p-8">Cargando sesión...</div>
 
-  // 1. Obtener Datos
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('total_bag')
+    .eq('id', user.id)
+    .single()
+
   const { data: invoices } = await supabase
     .from('invoices')
     .select('*')
@@ -25,6 +30,7 @@ export default async function DashboardPage() {
     .eq('created_by', user.id)
     .eq('risk_status', 'aprobado')
 
+  const totalBag = profile?.total_bag || 0
   const allInvoices = invoices || []
   const allPayers = payers || []
 
@@ -38,19 +44,22 @@ export default async function DashboardPage() {
 
   const activeInvoices = allInvoices.filter(inv => getVisualStatus(inv) === 'vigente')
   const overdueInvoices = allInvoices.filter(inv => getVisualStatus(inv) === 'vencida')
-  
+
   const totalPortfolio = activeInvoices.reduce((sum, inv) => sum + (inv.amount || 0), 0) + overdueInvoices.reduce((sum, inv) => sum + (inv.amount || 0), 0)
   const guaranteedAmount = allInvoices.filter(inv => inv.is_guaranteed && inv.status !== 'pagada').reduce((sum, inv) => sum + (inv.guaranteed_amount || 0), 0)
   const overdueAmount = overdueInvoices.reduce((sum, inv) => sum + (inv.amount || 0), 0)
-  
+
   const coveragePercent = totalPortfolio > 0 ? Math.round((guaranteedAmount / totalPortfolio) * 100) : 0
 
   // Calculation for Global Quota
-  const totalApprovedQuota = allPayers.reduce((sum, payer) => sum + (payer.approved_quota || 0), 0)
-  const availableQuota = Math.max(0, totalApprovedQuota - guaranteedAmount)
+  // El Cupo Disponible es la Bolsa Total menos lo que ya está garantizado/comprometido
+  const availableQuota = Math.max(0, totalBag - guaranteedAmount)
+
+  // Porcentaje de consumo de la bolsa
+  const consumptionPercent = totalBag > 0 ? Math.min(100, Math.round((guaranteedAmount / totalBag) * 100)) : 0
 
   // 3. Procesamiento para Gráficos
-  
+
   // Gráfico 1: Evolución Mensual (Simulada agrupando por fecha de emisión)
   // En un caso real haríamos un group by en SQL, aquí lo hacemos en JS
   const monthlyDataMap = new Map<string, number>()
@@ -59,7 +68,7 @@ export default async function DashboardPage() {
     const key = `${date.toLocaleString('default', { month: 'short' })}`
     monthlyDataMap.set(key, (monthlyDataMap.get(key) || 0) + inv.amount)
   })
-  
+
   // Convertir a array y tomar últimos 6 meses (ordenados cronológicamente si fuera necesario, aquí simplificado)
   const chartData = Array.from(monthlyDataMap.entries())
     .map(([name, total]) => ({ name, total }))
@@ -71,7 +80,7 @@ export default async function DashboardPage() {
     vencida: overdueInvoices.length,
     pagada: allInvoices.filter(inv => getVisualStatus(inv) === 'pagada').length
   }
-  
+
   const pieData = [
     { name: 'Vigente', value: statusCounts.vigente, color: '#3B82F6' }, // Blue
     { name: 'Vencida', value: statusCounts.vencida, color: '#EF4444' }, // Red
@@ -80,23 +89,23 @@ export default async function DashboardPage() {
 
 
   // Formateador
-  const formatCurrency = (amount: number) => 
+  const formatCurrency = (amount: number) =>
     new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(amount)
 
   // Preparar datos para exportación
   const exportData = allInvoices.map(inv => ({
-      Numero_Factura: inv.invoice_number,
-      Monto: inv.amount,
-      Fecha_Emision: inv.issue_date,
-      Fecha_Vencimiento: inv.due_date,
-      Estado: getVisualStatus(inv),
-      Garantizada: inv.is_guaranteed ? 'SI' : 'NO'
+    Numero_Factura: inv.invoice_number,
+    Monto: inv.amount,
+    Fecha_Emision: inv.issue_date,
+    Fecha_Vencimiento: inv.due_date,
+    Estado: getVisualStatus(inv),
+    Garantizada: inv.is_guaranteed ? 'SI' : 'NO'
   }))
 
   return (
     <div className="min-h-screen bg-gray-50/50 pb-12">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        
+
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8">
           <div>
@@ -104,63 +113,67 @@ export default async function DashboardPage() {
             <p className="mt-1 text-sm text-gray-500">Visión general de tu operación y estado de cartera.</p>
           </div>
           <div className="mt-4 md:mt-0 flex space-x-3">
-             {/* Filtros ocultos temporalmente hasta implementación completa */}
-             {/* <button className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+            {/* Filtros ocultos temporalmente hasta implementación completa */}
+            {/* <button className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
                 <Filter className="h-4 w-4 mr-2 text-gray-500" />
                 Filtros
              </button> */}
-             <ExportButton 
-                data={exportData} 
-                filename="informe_general_avalia.csv" 
-                label="Exportar Informe" 
-                className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none transition-colors"
-             />
+            <ExportButton
+              data={exportData}
+              filename="informe_general_avalia.csv"
+              label="Exportar Informe"
+              className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none transition-colors"
+            />
           </div>
         </div>
 
         {/* KPIs Grid */}
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 mb-8">
-          <KpiCard 
-            title="Cupo Disponible Global" 
-            value={formatCurrency(availableQuota)} 
-            icon={Wallet} 
+          <KpiCard
+            title="Cupo Disponible Global"
+            value={formatCurrency(availableQuota)}
+            icon={Wallet}
             color="green"
-            trend={{ value: 0, label: `Bolsa Adquirida: ${formatCurrency(totalApprovedQuota)}`, positive: true }}
+            trend={{
+              value: consumptionPercent,
+              label: `Bolsa Adquirida: ${formatCurrency(totalBag)}`,
+              positive: true
+            }}
             href="/dashboard/payers"
           />
-           <KpiCard 
-            title="Total Cartera Vigente" 
-            value={formatCurrency(totalPortfolio - overdueAmount)} 
-            icon={TrendingUp} 
+          <KpiCard
+            title="Total Cartera Vigente"
+            value={formatCurrency(totalPortfolio - overdueAmount)}
+            icon={TrendingUp}
             color="blue"
             href="/dashboard/invoices?status=vigente"
           />
-          <KpiCard 
-            title="Cartera Vencida" 
-            value={formatCurrency(overdueAmount)} 
-            icon={AlertCircle} 
+          <KpiCard
+            title="Cartera Vencida"
+            value={formatCurrency(overdueAmount)}
+            icon={AlertCircle}
             color="red"
             trend={{ value: overdueInvoices.length, label: 'facturas vencidas', positive: false }}
             href="/dashboard/invoices?status=vencida"
           />
-          <KpiCard 
-            title="Cobertura Garantía" 
-            value={`${coveragePercent}%`} 
-            icon={ShieldCheck} 
+          <KpiCard
+            title="Cobertura Garantía"
+            value={`${coveragePercent}%`}
+            icon={ShieldCheck}
             color="purple"
             trend={{ value: guaranteedAmount, label: 'asegurado', positive: true }}
           />
-          <KpiCard 
-            title="Facturas Activas" 
-            value={activeInvoices.length} 
-            icon={FileText} 
+          <KpiCard
+            title="Facturas Activas"
+            value={activeInvoices.length}
+            icon={FileText}
             color="blue"
             href="/dashboard/invoices"
           />
-           <KpiCard 
-            title="Total Recaudado" 
+          <KpiCard
+            title="Total Recaudado"
             value={formatCurrency(statusCounts.pagada * 1500000)} // Simulado
-            icon={Wallet} 
+            icon={Wallet}
             color="green"
             href="/dashboard/invoices?status=pagada"
           />
@@ -168,16 +181,16 @@ export default async function DashboardPage() {
 
         {/* Charts Section */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
-          
+
           {/* Chart 1: Evolución */}
           <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-100 p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Evolución de Facturación</h3>
             {chartData.length > 0 ? (
-                <InvoiceChart data={chartData} />
+              <InvoiceChart data={chartData} />
             ) : (
-                <div className="h-[300px] flex items-center justify-center text-gray-400 bg-gray-50 rounded-lg">
-                    Sin datos suficientes para graficar
-                </div>
+              <div className="h-[300px] flex items-center justify-center text-gray-400 bg-gray-50 rounded-lg">
+                Sin datos suficientes para graficar
+              </div>
             )}
           </div>
 
@@ -185,75 +198,75 @@ export default async function DashboardPage() {
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Estado de Cartera</h3>
             {pieData.length > 0 ? (
-                <StatusDistributionChart data={pieData} />
+              <StatusDistributionChart data={pieData} />
             ) : (
-                <div className="h-[300px] flex items-center justify-center text-gray-400 bg-gray-50 rounded-lg">
-                    Sin datos
-                </div>
+              <div className="h-[300px] flex items-center justify-center text-gray-400 bg-gray-50 rounded-lg">
+                Sin datos
+              </div>
             )}
           </div>
         </div>
 
         {/* Tabla Reciente */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-            <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-gray-900">Operaciones Recientes</h3>
-                <Link href="/dashboard/invoices" className="text-sm font-medium text-indigo-600 hover:text-indigo-800">
-                    Ver historial completo &rarr;
-                </Link>
-            </div>
-            <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50/50">
-                        <tr>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Factura</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cliente/Pagador</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Valor</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
-                        </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                        {allInvoices.slice(0, 5).map((inv) => (
-                            <tr 
-                                key={inv.id} 
-                                className="group hover:bg-gray-50 transition-colors cursor-pointer relative"
-                            >
-                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                    <Link href={`/dashboard/invoices/${inv.id}`} className="absolute inset-0 z-10" aria-label={`Ver detalle de factura ${inv.invoice_number}`} />
-                                    <span className="relative z-0 group-hover:text-indigo-600 transition-colors">
-                                        {inv.invoice_number}
-                                    </span>
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                    {new Date(inv.issue_date).toLocaleDateString()}
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                    {/* Aquí podríamos hacer un join con payers si quisiéramos mostrar nombre */}
-                                    ID: {inv.payer_id?.substring(0, 8)}...
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                    {formatCurrency(inv.amount)}
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap">
-                                    <span className={`px-2.5 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full capitalize
-                                        ${getVisualStatus(inv) === 'vigente' ? 'bg-blue-100 text-blue-800' : 
-                                          getVisualStatus(inv) === 'pagada' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                                        {getVisualStatus(inv)}
-                                    </span>
-                                </td>
-                            </tr>
-                        ))}
-                        {allInvoices.length === 0 && (
-                            <tr>
-                                <td colSpan={5} className="px-6 py-12 text-center text-gray-500">
-                                    No hay movimientos registrados recientemente.
-                                </td>
-                            </tr>
-                        )}
-                    </tbody>
-                </table>
-            </div>
+          <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between">
+            <h3 className="text-lg font-semibold text-gray-900">Operaciones Recientes</h3>
+            <Link href="/dashboard/invoices" className="text-sm font-medium text-indigo-600 hover:text-indigo-800">
+              Ver historial completo &rarr;
+            </Link>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50/50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Factura</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cliente/Pagador</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Valor</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {allInvoices.slice(0, 5).map((inv) => (
+                  <tr
+                    key={inv.id}
+                    className="group hover:bg-gray-50 transition-colors cursor-pointer relative"
+                  >
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                      <Link href={`/dashboard/invoices/${inv.id}`} className="absolute inset-0 z-10" aria-label={`Ver detalle de factura ${inv.invoice_number}`} />
+                      <span className="relative z-0 group-hover:text-indigo-600 transition-colors">
+                        {inv.invoice_number}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {new Date(inv.issue_date).toLocaleDateString()}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {/* Aquí podríamos hacer un join con payers si quisiéramos mostrar nombre */}
+                      ID: {inv.payer_id?.substring(0, 8)}...
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                      {formatCurrency(inv.amount)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`px-2.5 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full capitalize
+                                        ${getVisualStatus(inv) === 'vigente' ? 'bg-blue-100 text-blue-800' :
+                          getVisualStatus(inv) === 'pagada' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                        {getVisualStatus(inv)}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+                {allInvoices.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-12 text-center text-gray-500">
+                      No hay movimientos registrados recientemente.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
 
       </div>
