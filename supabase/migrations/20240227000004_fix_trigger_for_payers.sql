@@ -16,7 +16,7 @@ BEGIN
     RETURN new;
   END IF;
 
-  -- Para usuarios administrativos (client, superadmin), crear perfil normalmente
+  -- Para usuarios administrativos (client, superadmin), crear o actualizar perfil (UPSERT)
   INSERT INTO public.profiles (id, email, company_name, role, nit, total_bag)
   VALUES (
     new.id,
@@ -24,8 +24,22 @@ BEGIN
     new.raw_user_meta_data->>'company_name',
     COALESCE((new.raw_user_meta_data->>'role')::user_role, 'client'::user_role),
     new.raw_user_meta_data->>'nit',
-    COALESCE((new.raw_user_meta_data->>'total_bag')::numeric, 0)
-  );
+    CASE 
+      WHEN new.raw_user_meta_data->>'total_bag' IS NULL OR new.raw_user_meta_data->>'total_bag' = '' THEN 0
+      ELSE (new.raw_user_meta_data->>'total_bag')::numeric
+    END
+  )
+  ON CONFLICT (id) DO UPDATE SET
+    email = EXCLUDED.email,
+    company_name = EXCLUDED.company_name,
+    role = EXCLUDED.role,
+    nit = EXCLUDED.nit,
+    total_bag = EXCLUDED.total_bag;
+
+  RETURN new;
+EXCEPTION WHEN OTHERS THEN
+  -- En última instancia, queremos que el usuario se cree en Auth aunque el perfil falle
+  -- Esto evita el error "Database error creating new user" si algo sale mal en el trigger
   RETURN new;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;

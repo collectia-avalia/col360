@@ -70,7 +70,9 @@ export async function createClientAction(formData: FormData) {
 
   // 3. Enviar Correo de Bienvenida con Credenciales
   // Construir la URL base dinámicamente o desde variables de entorno
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000'
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL
+    ? process.env.NEXT_PUBLIC_APP_URL
+    : (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000')
   const loginUrl = `${baseUrl}/login`
 
   try {
