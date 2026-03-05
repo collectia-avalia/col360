@@ -3,6 +3,7 @@
 import React from 'react'
 
 import { createClient } from '@/lib/supabase/server'
+import { ensureUserProfile } from '@/lib/supabase/profile'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { z } from 'zod'
@@ -118,6 +119,13 @@ export async function createInvoiceAction(formData: FormData) {
   } else {
     return { error: 'Debes subir el archivo de la factura (PDF/XML)' }
   }
+
+  // --- BLINDAJE DE PERFIL ---
+  const profileResult = await ensureUserProfile(supabase, user.id)
+  if (!profileResult.success) {
+    return { error: 'Error de integridad: ' + profileResult.error }
+  }
+  // --------------------------
 
   // 4. Guardar Factura
   const { error: insertError } = await supabase

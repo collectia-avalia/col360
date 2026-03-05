@@ -3,6 +3,7 @@
 import React from 'react'
 
 import { createClient } from '@/lib/supabase/server'
+import { ensureUserProfile } from '@/lib/supabase/profile'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { z } from 'zod'
@@ -47,6 +48,13 @@ export async function createPayerAction(formData: FormData) {
   }
 
   const { razonSocial, contactEmail, nit } = validation.data
+
+  // --- BLINDAJE DE PERFIL ---
+  const profileResult = await ensureUserProfile(supabase, user.id)
+  if (!profileResult.success) {
+    return { error: 'Error de integridad: ' + profileResult.error }
+  }
+  // --------------------------
 
   const finalNit = nit || `PENDING-${Date.now()}`
   const invitationToken = crypto.randomUUID()
