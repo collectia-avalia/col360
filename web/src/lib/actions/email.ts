@@ -2,6 +2,20 @@
 
 import { resend } from '@/lib/resend'
 import React from 'react'
+import fs from 'fs'
+import path from 'path'
+
+const LOG_FILE = path.join(process.cwd(), 'email_debug.log')
+
+function logToFile(message: string) {
+    const timestamp = new Date().toISOString()
+    const logMessage = `[${timestamp}] ${message}\n`
+    try {
+        fs.appendFileSync(LOG_FILE, logMessage)
+    } catch (err) {
+        console.error('Error writing to log file:', err)
+    }
+}
 
 /**
  * Define el email desde el cual se enviarán las notificaciones.
@@ -11,7 +25,7 @@ import React from 'react'
  * Define el email desde el cual se enviarán las notificaciones.
  * MODO PRODUCCIÓN: Dominio verificado 'avaliab2b.com'.
  */
-const SENDER_EMAIL = 'Avalia SaaS <notificaciones@avaliab2b.com>'
+const SENDER_EMAIL = 'Avalia <notificaciones@avaliab2b.com>'
 
 interface SendEmailParams {
     to: string | string[]
@@ -32,6 +46,11 @@ export async function sendEmail(params: SendEmailParams) {
     }
 
     try {
+        const keyLength = process.env.RESEND_API_KEY?.length || 0;
+        const logMsg = `Intentando enviar a: ${to}, Asunto: ${subject} (Key length: ${keyLength})`
+        console.log(`[EMAIL_DEBUG] ${logMsg}`)
+        logToFile(logMsg)
+
         const { data: result, error } = await resend.emails.send({
             from: SENDER_EMAIL,
             to,
@@ -41,13 +60,20 @@ export async function sendEmail(params: SendEmailParams) {
         })
 
         if (error) {
-            console.error('Error enviando email con Resend:', error)
+            const errorMsg = `Error de Resend: ${JSON.stringify(error, null, 2)}`
+            console.error(`[EMAIL_DEBUG] ${errorMsg}`)
+            logToFile(errorMsg)
             return { success: false, error: error.message }
         }
 
+        const successMsg = `Éxito. ID de mensaje: ${result?.id}`
+        console.log(`[EMAIL_DEBUG] ${successMsg}`)
+        logToFile(successMsg)
         return { success: true, messageId: result?.id }
     } catch (err) {
-        console.error('Error inesperado al enviar email:', err)
+        const unexpectedMsg = `Error inesperado: ${err}`
+        console.error(`[EMAIL_DEBUG] ${unexpectedMsg}`)
+        logToFile(unexpectedMsg)
         return { success: false, error: 'Ocurrió un error inesperado al enviar el correo.' }
     }
 }

@@ -4,6 +4,7 @@ import { ArrowLeft, Building, FileText, CheckCircle, XCircle, DollarSign, Clock,
 import { notFound } from 'next/navigation'
 import { PayerActions } from './PayerActions'
 import { InvoicesTable } from './InvoicesTable'
+import { DigitalCertificate } from '@/components/DigitalCertificate'
 
 export default async function PayerDetailsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -12,7 +13,7 @@ export default async function PayerDetailsPage({ params }: { params: Promise<{ i
   // Obtener detalles del pagador CON sus facturas
   const { data: payer, error } = await supabase
     .from('payers')
-    .select('*, invoices(*)') // Traemos la relación de facturas
+    .select('*, invoices(*), payer_documents(*)')
     .eq('id', id)
     .single()
 
@@ -41,6 +42,8 @@ export default async function PayerDetailsPage({ params }: { params: Promise<{ i
 
   const status = statusConfig[payer.risk_status as keyof typeof statusConfig] || statusConfig.pendiente
   const StatusIcon = status.icon
+
+  const documents = (payer.payer_documents || []) as any[]
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
@@ -80,21 +83,44 @@ export default async function PayerDetailsPage({ params }: { params: Promise<{ i
                         <p className="text-base font-medium text-slate-900">{payer.nit}</p>
                     </div>
                     <div>
-                        <label className="block text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Sector</label>
-                        <p className="text-base font-medium text-slate-900">{payer.sector || 'No especificado'}</p>
+                        <label className="block text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Actividad</label>
+                        <p className="text-base font-medium text-slate-900">{payer.business_activity || 'No especificado'}</p>
                     </div>
                     <div>
-                        <label className="block text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Contacto Principal</label>
-                        <p className="text-base font-medium text-slate-900">{payer.contact_name || 'No registrado'}</p>
+                        <label className="block text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Producto/Servicio</label>
+                        <p className="text-base font-medium text-slate-900">{payer.product_service || 'No registrado'}</p>
                     </div>
                     <div>
-                        <label className="block text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Teléfono</label>
-                        <p className="text-base font-medium text-slate-900">{payer.phone || 'No registrado'}</p>
+                        <label className="block text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Compra Mensual / Plazo</label>
+                        <p className="text-base font-medium text-slate-900">
+                          {payer.monthly_purchase_value ? `$ ${new Intl.NumberFormat('es-CO').format(payer.monthly_purchase_value)}` : '-'} / {payer.payment_term || '-'} días
+                        </p>
                     </div>
-                    <div className="md:col-span-2">
-                        <label className="block text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Email Corporativo</label>
-                        <p className="text-base font-medium text-slate-900">{payer.email || 'No registrado'}</p>
-                    </div>
+                </div>
+            </div>
+
+            {/* Checklist de Debida Diligencia */}
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                <div className="px-6 py-3 border-b border-slate-100 bg-slate-900">
+                    <h3 className="text-sm font-bold text-white uppercase tracking-widest flex items-center gap-2">
+                       <CheckCircle className="w-4 h-4 text-indigo-400" />
+                       Progreso Debida Diligencia
+                    </h3>
+                </div>
+                <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <CheckItem 
+                      label="Información" 
+                      isDone={!!(payer.business_activity && payer.product_service && payer.monthly_purchase_value)} 
+                    />
+                    <CheckItem 
+                      label="Documentos" 
+                      isDone={documents.length >= 5} 
+                      sub={`(${documents.length}/5)`}
+                    />
+                    <CheckItem 
+                      label="Firma OTP" 
+                      isDone={!!payer.signed_at} 
+                    />
                 </div>
             </div>
 
@@ -106,20 +132,34 @@ export default async function PayerDetailsPage({ params }: { params: Promise<{ i
                         Documentos Adjuntos
                     </h3>
                 </div>
-                <div className="p-6">
-                    {/* Aquí iría la lista de documentos subidos. Por ahora estático. */}
-                    <div className="flex items-center p-3 border border-slate-200 rounded-lg bg-slate-50">
-                        <div className="h-10 w-10 bg-red-100 rounded-lg flex items-center justify-center text-red-500 mr-4">
-                            <span className="font-bold text-xs">PDF</span>
-                        </div>
-                        <div className="flex-1">
-                            <p className="text-sm font-medium text-slate-900">Cámara de Comercio.pdf</p>
-                            <p className="text-xs text-slate-500">Subido el {new Date(payer.created_at).toLocaleDateString()}</p>
-                        </div>
-                        <button className="text-sm text-avalia-blue hover:underline">Ver</button>
-                    </div>
+                <div className="p-6 space-y-3">
+                    {documents.map((doc: any) => (
+                      <div key={doc.id} className="flex items-center p-3 border border-slate-200 rounded-lg bg-slate-50">
+                          <div className="h-10 w-10 bg-indigo-100 rounded-lg flex items-center justify-center text-indigo-500 mr-4">
+                              <FileText className="w-5 h-5" />
+                          </div>
+                          <div className="flex-1">
+                              <p className="text-sm font-bold text-slate-900 capitalize">{doc.doc_type.replace(/_/g, ' ')}</p>
+                              <p className="text-xs text-slate-500">Subido el {new Date(doc.updated_at || doc.created_at).toLocaleDateString()}</p>
+                          </div>
+                          <CheckCircle className="w-5 h-5 text-green-500" />
+                      </div>
+                    ))}
+                    {documents.length === 0 && (
+                      <p className="text-sm text-slate-500 text-center py-4 italic">No hay documentos cargados aún.</p>
+                    )}
                 </div>
             </div>
+
+            {/* Visual Signature Certificate */}
+            {payer.signed_at && (
+              <DigitalCertificate 
+                payerName={payer.razon_social}
+                signedAt={payer.signed_at}
+                signedIp={payer.signed_ip}
+                signatureHash={payer.signature_hash}
+              />
+            )}
         </div>
 
         {/* Columna Derecha: Estado y Acciones */}
@@ -190,6 +230,22 @@ export default async function PayerDetailsPage({ params }: { params: Promise<{ i
       <div className="space-y-4">
         <h2 className="text-lg font-semibold text-slate-900">Historial de Facturas</h2>
         <InvoicesTable invoices={payer.invoices || []} payerId={payer.id} />
+      </div>
+    </div>
+  )
+}
+
+function CheckItem({ label, isDone, sub }: { label: string, isDone: boolean, sub?: string }) {
+  return (
+    <div className={`p-4 rounded-xl border flex items-center gap-3 ${isDone ? 'bg-green-50 border-green-100 text-green-700' : 'bg-slate-50 border-slate-100 text-slate-400'}`}>
+      <div className={`w-8 h-8 rounded-full flex items-center justify-center ${isDone ? 'bg-green-500 text-white shadow-lg shadow-green-200' : 'bg-slate-200 text-slate-400'}`}>
+        <CheckCircle className="w-5 h-5" />
+      </div>
+      <div>
+        <p className="text-sm font-bold leading-tight">{label}</p>
+        <p className="text-[10px] uppercase font-black opacity-60 tracking-wider">
+          {isDone ? 'Completado' : 'Pendiente'} {sub}
+        </p>
       </div>
     </div>
   )

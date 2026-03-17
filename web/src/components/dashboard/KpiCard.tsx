@@ -6,11 +6,12 @@ interface KpiCardProps {
   value: string | number
   icon: LucideIcon
   trend?: {
-    value: number
+    value: number | string
     label: string
     positive: boolean
+    suffix?: string
   }
-  color?: 'blue' | 'green' | 'red' | 'purple'
+  color?: 'blue' | 'green' | 'red' | 'purple' | 'orange' | 'indigo'
   href?: string
 }
 
@@ -20,6 +21,8 @@ export function KpiCard({ title, value, icon: Icon, trend, color = 'blue', href 
     green: 'bg-green-50 text-green-600',
     red: 'bg-red-50 text-red-600',
     purple: 'bg-avalia-violet/10 text-avalia-violet',
+    orange: 'bg-orange-50 text-orange-600',
+    indigo: 'bg-indigo-50 text-indigo-600',
   }
 
   const CardContent = (
@@ -44,7 +47,7 @@ export function KpiCard({ title, value, icon: Icon, trend, color = 'blue', href 
       {trend && (
         <div className="bg-gray-50 px-5 py-3 border-t border-gray-100">
           <div className={`text-sm font-medium ${trend.positive ? 'text-green-600' : 'text-red-600'} flex items-center`}>
-            {trend.positive ? '+' : ''}{trend.value}%
+            {trend.positive ? '+' : ''}{trend.value}{trend.suffix ?? '%'}
             <span className="text-gray-500 ml-2 font-normal">{trend.label}</span>
           </div>
         </div>

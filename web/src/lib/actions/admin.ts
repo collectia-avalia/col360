@@ -9,25 +9,29 @@ export async function deleteClientAction(userId: string) {
     const supabase = createAdminClient()
 
     try {
+        console.log(`[ADMIN] Intentando eliminar cliente: ${userId}`)
         const { error: authError } = await supabase.auth.admin.deleteUser(userId)
 
         if (authError) {
             console.error('Error eliminando usuario de Auth:', authError)
-            return { error: 'Error al eliminar usuario del sistema de autenticación.' }
+            return { error: `Error en Auth: ${authError.message}` }
         }
 
+        // Con ON DELETE CASCADE en la DB, esto debería limpiar todo.
         const { error: profileError } = await supabase
             .from('profiles')
             .delete()
             .eq('id', userId)
 
         if (profileError) {
-            console.warn('Advertencia: Error borrando perfil:', profileError)
+            console.error('Error eliminando perfil:', profileError)
+            return { error: `Error en Base de Datos: ${profileError.message}` }
         }
 
         revalidatePath('/admin/clients')
         return { success: true }
-    } catch {
+    } catch (e) {
+        console.error('Excepción en deleteClientAction:', e)
         return { error: 'Error inesperado al procesar la solicitud.' }
     }
 }

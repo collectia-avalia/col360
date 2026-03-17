@@ -13,7 +13,7 @@ export default async function PayersPage() {
 
   const { data: payers } = await supabase
     .from('payers')
-    .select('*, invoices(*)')
+    .select('*, invoices(*), payer_documents(id)')
     .eq('created_by', user?.id)
     .order('created_at', { ascending: false })
 

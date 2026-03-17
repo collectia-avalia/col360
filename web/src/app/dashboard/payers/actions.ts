@@ -13,6 +13,8 @@ import ConfirmPayerCreationEmail from '@/components/emails/ConfirmPayerCreationE
 
 const payerSchema = z.object({
   razonSocial: z.string().min(3),
+  contactName: z.string().min(3),
+  contactPhone: z.string().min(7),
   contactEmail: z.string().email(),
   nit: z.string().optional(),
   authContact: z.literal('on'),
@@ -22,6 +24,8 @@ const payerSchema = z.object({
 const UpdatePayerSchema = z.object({
   id: z.string().uuid(),
   razon_social: z.string().min(1, "La razon social es obligatoria"),
+  contact_name: z.string().min(3, "El nombre de contacto es obligatorio").optional(),
+  contact_phone: z.string().min(7, "El celular es obligatorio").optional(),
   contact_email: z.string().email().optional(),
 })
 
@@ -36,6 +40,8 @@ export async function createPayerAction(formData: FormData) {
   // 1. Validar Datos Basicos
   const rawData = {
     razonSocial: formData.get('razonSocial'),
+    contactName: formData.get('contactName'),
+    contactPhone: formData.get('contactPhone'),
     contactEmail: formData.get('contactEmail'),
     nit: formData.get('nit') || undefined,
     authContact: formData.get('auth_contact'),
@@ -47,7 +53,24 @@ export async function createPayerAction(formData: FormData) {
     return { error: 'Datos invalidos', details: validation.error.flatten().fieldErrors }
   }
 
-  const { razonSocial, contactEmail, nit } = validation.data
+  const { razonSocial, contactName, contactPhone, contactEmail, nit } = validation.data
+
+  // --- COMPROBACIÓN DE NIT DUPLICADO ---
+  if (nit) {
+    const { data: existingPayer } = await supabase
+      .from('payers')
+      .select('id, razon_social')
+      .eq('nit', nit)
+      .eq('created_by', user.id)
+      .maybeSingle()
+
+    if (existingPayer) {
+      return { 
+        error: `Ya tienes registrado un cliente con el NIT ${nit} (${existingPayer.razon_social}).` 
+      }
+    }
+  }
+  // -------------------------------------
 
   // --- BLINDAJE DE PERFIL ---
   const profileResult = await ensureUserProfile(supabase, user.id)
@@ -65,6 +88,8 @@ export async function createPayerAction(formData: FormData) {
     .insert({
       razon_social: razonSocial,
       nit: finalNit,
+      contact_name: contactName,
+      contact_phone: contactPhone,
       contact_email: contactEmail,
       created_by: user.id,
       risk_status: 'pendiente',
@@ -205,4 +230,58 @@ export async function updatePayerAction(formData: FormData) {
 
   revalidatePath('/dashboard/payers')
   return { success: true }
+}
+
+export async function resendPayerInvitationAction(payerId: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) return { error: 'No autorizado' }
+
+  // 1. Obtener datos del pagador
+  const { data: payer, error: fetchError } = await supabase
+    .from('payers')
+    .select('*')
+    .eq('id', payerId)
+    .single()
+
+  if (fetchError || !payer) {
+    return { error: 'Payer no encontrado' }
+  }
+
+  // 2. Usar el token existente
+  const invitationToken = payer.invitation_token
+
+  // 3. Construir URL
+  let baseUrl = 'http://localhost:3000'
+  if (process.env.NEXT_PUBLIC_APP_URL) {
+    baseUrl = process.env.NEXT_PUBLIC_APP_URL
+  } else if (process.env.VERCEL_URL) {
+    baseUrl = `https://${process.env.VERCEL_URL}`
+  }
+
+  const formularioLink = `${baseUrl}/formulario/${invitationToken}`
+
+  // 4. Enviar Email
+  try {
+    const result = await sendEmail({
+      to: payer.contact_email,
+      subject: 'Recordatorio: Completa tu Estudio de Credito - Avalia',
+      react: React.createElement(InvitePayerEmail, {
+        razonSocial: payer.razon_social,
+        inviterEmail: user.email || 'Avalia',
+        inviteLink: formularioLink,
+      })
+    })
+
+    if (!result.success) {
+      console.error('Error enviando email:', result.error)
+      return { error: 'Error enviando el correo' }
+    }
+
+    return { success: true, message: `Invitación reenviada a ${payer.contact_email}` }
+  } catch (err) {
+    console.error('Error reenviando invitación:', err)
+    return { error: 'Excepción al enviar el correo' }
+  }
 }

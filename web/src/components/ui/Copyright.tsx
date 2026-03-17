@@ -18,8 +18,8 @@ import React from 'react'
 export function Copyright({ className = "" }: { className?: string }) {
   return (
     <div className={`text-center py-4 ${className}`}>
-      <p className="text-[10px] text-slate-400 font-medium tracking-wide uppercase">
-        &copy; {new Date().getFullYear()} AvalIA SaaS &bull; iAnGo | Agencia de Desarrollo y Soluciones con IA &bull; Gustavo Vargas
+      <p className="text-[10px] text-slate-400 font-medium tracking-wide">
+        &copy; 2026 avalia B2b by Collectia BPo
       </p>
     </div>
   )

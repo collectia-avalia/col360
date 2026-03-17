@@ -298,34 +298,33 @@ export default function NewInvoiceForm({ payers }: { payers: PayerOption[] }) {
                 <div className={`mt-1 flex justify-center px-6 pt-10 pb-10 border-2 border-dashed rounded-xl transition-all duration-300 relative
                     ${isAnalyzing ? 'border-blue-400 bg-blue-50' : 'border-gray-300 hover:bg-gray-50 hover:border-gray-400'}`}>
                     
-                    {isAnalyzing ? (
-                        <div className="text-center py-4">
-                            <Loader2 className="mx-auto h-12 w-12 text-blue-500 animate-spin" />
-                            <p className="mt-4 text-sm font-medium text-blue-600">Analizando documento...</p>
-                            <p className="text-xs text-blue-400 mt-1">Extrayendo datos de la factura</p>
-                        </div>
-                    ) : (
-                        <div className="space-y-1 text-center">
-                            <UploadCloud className={`mx-auto h-12 w-12 ${fileName ? 'text-green-500' : 'text-gray-400'}`} />
-                            <div className="flex text-sm text-gray-600 justify-center">
-                                <label htmlFor="fileInvoice" className="relative cursor-pointer rounded-md font-medium text-[#7c3aed] hover:text-[#6d28d9] focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-[#7c3aed]">
-                                    <span>{fileName ? 'Cambiar archivo' : 'Arrastra tu Factura (XML o PDF)'}</span>
-                                    <input id="fileInvoice" name="fileInvoice" type="file" className="sr-only" accept=".pdf,.xml" required 
-                                        onChange={handleFileChange}
-                                    />
-                                </label>
-                            </div>
-                            <p className="text-xs text-gray-500">
-                                Sube el XML para autocompletado mágico
-                            </p>
-                            {fileName && (
-                                <div className="mt-4 inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                    <FileText className="w-3 h-3 mr-1" />
-                                    {fileName}
-                                </div>
-                            )}
+                    {isAnalyzing && (
+                        <div className="absolute inset-0 z-10 bg-blue-50/80 backdrop-blur-[1px] flex flex-col items-center justify-center rounded-xl animate-in fade-in duration-300">
+                            <Loader2 className="h-10 w-10 text-blue-500 animate-spin" />
+                            <p className="mt-2 text-sm font-medium text-blue-600">Analizando documento...</p>
                         </div>
                     )}
+
+                    <div className={`space-y-1 text-center ${isAnalyzing ? 'opacity-20 pointer-events-none' : ''}`}>
+                        <UploadCloud className={`mx-auto h-12 w-12 ${fileName ? 'text-green-500' : 'text-gray-400'}`} />
+                        <div className="flex text-sm text-gray-600 justify-center">
+                            <label htmlFor="fileInvoice" className="relative cursor-pointer rounded-md font-medium text-[#7c3aed] hover:text-[#6d28d9] focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-[#7c3aed]">
+                                <span>{fileName ? 'Cambiar archivo' : 'Arrastra tu Factura (XML o PDF)'}</span>
+                                <input id="fileInvoice" name="fileInvoice" type="file" className="sr-only" accept=".pdf,.xml" required 
+                                    onChange={handleFileChange}
+                                />
+                            </label>
+                        </div>
+                        <p className="text-xs text-gray-500">
+                            Sube el XML para autocompletado mágico
+                        </p>
+                        {fileName && (
+                            <div className="mt-4 inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                <FileText className="w-3 h-3 mr-1" />
+                                {fileName}
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
 

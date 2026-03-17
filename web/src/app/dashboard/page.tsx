@@ -48,6 +48,8 @@ export default async function DashboardPage() {
   const totalPortfolio = activeInvoices.reduce((sum, inv) => sum + (inv.amount || 0), 0) + overdueInvoices.reduce((sum, inv) => sum + (inv.amount || 0), 0)
   const guaranteedAmount = allInvoices.filter(inv => inv.is_guaranteed && inv.status !== 'pagada').reduce((sum, inv) => sum + (inv.guaranteed_amount || 0), 0)
   const overdueAmount = overdueInvoices.reduce((sum, inv) => sum + (inv.amount || 0), 0)
+  const totalRadicado = allInvoices.reduce((sum, inv) => sum + (inv.amount || 0), 0)
+  const totalRecaudado = allInvoices.filter(inv => inv.status === 'pagada').reduce((sum, inv) => sum + (inv.amount || 0), 0)
 
   const coveragePercent = totalPortfolio > 0 ? Math.round((guaranteedAmount / totalPortfolio) * 100) : 0
 
@@ -128,7 +130,7 @@ export default async function DashboardPage() {
         </div>
 
         {/* KPIs Grid */}
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 mb-8">
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4 mb-8">
           <KpiCard
             title="Cupo Disponible Global"
             value={formatCurrency(availableQuota)}
@@ -137,9 +139,32 @@ export default async function DashboardPage() {
             trend={{
               value: consumptionPercent,
               label: `Bolsa Adquirida: ${formatCurrency(totalBag)}`,
-              positive: true
+              positive: true,
+              suffix: '%'
             }}
             href="/dashboard/payers"
+          />
+          <KpiCard
+            title="Facturas Radicadas"
+            value={formatCurrency(totalRadicado)}
+            icon={FileText}
+            color="indigo"
+            trend={{ value: allInvoices.length, label: 'facturas totales', positive: true, suffix: '' }}
+          />
+          <KpiCard
+            title="Total Recaudado"
+            value={formatCurrency(totalRecaudado)}
+            icon={ShieldCheck}
+            color="green"
+            trend={{ value: allInvoices.filter(i => i.status === 'pagada').length, label: 'facturas pagadas', positive: true, suffix: '' }}
+            href="/dashboard/invoices?status=pagada"
+          />
+          <KpiCard
+            title="Cobertura Garantía"
+            value={`${coveragePercent}%`}
+            icon={ShieldCheck}
+            color="purple"
+            trend={{ value: formatCurrency(guaranteedAmount), label: 'asegurado', positive: true, suffix: '' }}
           />
           <KpiCard
             title="Total Cartera Vigente"
@@ -153,29 +178,15 @@ export default async function DashboardPage() {
             value={formatCurrency(overdueAmount)}
             icon={AlertCircle}
             color="red"
-            trend={{ value: overdueInvoices.length, label: 'facturas vencidas', positive: false }}
+            trend={{ value: overdueInvoices.length, label: 'facturas vencidas', positive: false, suffix: '' }}
             href="/dashboard/invoices?status=vencida"
-          />
-          <KpiCard
-            title="Cobertura Garantía"
-            value={`${coveragePercent}%`}
-            icon={ShieldCheck}
-            color="purple"
-            trend={{ value: guaranteedAmount, label: 'asegurado', positive: true }}
           />
           <KpiCard
             title="Facturas Activas"
             value={activeInvoices.length}
             icon={FileText}
-            color="blue"
-            href="/dashboard/invoices"
-          />
-          <KpiCard
-            title="Total Recaudado"
-            value={formatCurrency(statusCounts.pagada * 1500000)} // Simulado
-            icon={Wallet}
-            color="green"
-            href="/dashboard/invoices?status=pagada"
+            color="orange"
+            href="/dashboard/invoices?status=vigente"
           />
         </div>
 

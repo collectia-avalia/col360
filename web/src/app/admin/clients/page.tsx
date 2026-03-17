@@ -41,10 +41,10 @@ export default async function ClientsPage() {
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Empresa
               </th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Email / Usuario
               </th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Estado
               </th>
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -53,7 +53,7 @@ export default async function ClientsPage() {
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Fecha Registro
               </th>
-              <th scope="col" className="relative px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th scope="col" className="relative px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-24">
                 Acciones
               </th>
             </tr>
@@ -69,9 +69,12 @@ export default async function ClientsPage() {
                       </div>
                     </div>
                     <div className="ml-4">
-                      <div className="text-sm font-medium text-gray-900">
+                      <Link 
+                        href={`/admin/clients/${client.id}`}
+                        className="text-sm font-medium text-indigo-600 hover:text-indigo-900"
+                      >
                         {client.company_name || <span className="text-gray-400 italic">Pendiente de registro</span>}
-                      </div>
+                      </Link>
                     </div>
                   </div>
                 </td>
@@ -89,7 +92,7 @@ export default async function ClientsPage() {
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                   {new Date(client.created_at).toLocaleDateString()}
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                <td className="px-4 py-4 whitespace-nowrap text-center text-sm font-medium">
                   <ClientActions userId={client.id} />
                 </td>
               </tr>

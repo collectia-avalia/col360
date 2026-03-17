@@ -55,94 +55,87 @@ export default async function AdminDashboard({
   const prevRangeStart = getPreviousRangeStart(selectedRange, rangeStart)
   const rangeLabel = rangeOptions.find((o) => o.key === selectedRange)?.label || '6 meses'
 
-  // 1. Obtener Datos Globales en Paralelo
+  // 1. Obtener Datos Globales
   const [
-    { count: clientsCountTotal },
+    { data: allClients },
     { count: pendingPayersCountTotal },
-    { data: rangeInvoices },
-    { data: prevInvoices },
-    { count: newClientsInRange },
-    { count: newClientsPrevRange },
-    { count: newPendingInRange },
-    { count: newPendingPrevRange },
-    { count: totalInvoicesCount }
+    { data: allPayers },
+    { data: allInvoices },
   ] = await Promise.all([
-    supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'client'),
+    supabase.from('profiles').select('id, company_name, total_bag, created_at').eq('role', 'client'),
     supabase.from('payers').select('*', { count: 'exact', head: true }).eq('risk_status', 'pendiente'),
-    supabase
-      .from('invoices')
-      .select('amount, created_at, is_guaranteed')
-      .gte('created_at', rangeStart.toISOString())
-      .order('created_at', { ascending: true }),
-    supabase
-      .from('invoices')
-      .select('amount, created_at, is_guaranteed')
-      .gte('created_at', prevRangeStart.toISOString())
-      .lt('created_at', rangeStart.toISOString())
-      .order('created_at', { ascending: true }),
-    supabase
-      .from('profiles')
-      .select('*', { count: 'exact', head: true })
-      .eq('role', 'client')
-      .gte('created_at', rangeStart.toISOString()),
-    supabase
-      .from('profiles')
-      .select('*', { count: 'exact', head: true })
-      .eq('role', 'client')
-      .gte('created_at', prevRangeStart.toISOString())
-      .lt('created_at', rangeStart.toISOString()),
-    supabase
-      .from('payers')
-      .select('*', { count: 'exact', head: true })
-      .eq('risk_status', 'pendiente')
-      .gte('created_at', rangeStart.toISOString()),
-    supabase
-      .from('payers')
-      .select('*', { count: 'exact', head: true })
-      .eq('risk_status', 'pendiente')
-      .gte('created_at', prevRangeStart.toISOString())
-      .lt('created_at', rangeStart.toISOString()),
-    supabase.from('invoices').select('*', { count: 'exact', head: true }),
+    supabase.from('payers').select('approved_quota, created_at, risk_status'),
+    supabase.from('invoices').select('amount, created_at, is_guaranteed, status, due_date'),
   ])
 
-  // 2. Procesar Métricas
-  const chartInvoices = rangeInvoices || []
-  const totalVolume = chartInvoices.reduce((sum, inv) => sum + (inv.amount || 0), 0)
-  const totalFinanced = chartInvoices
-    .filter((inv) => inv.is_guaranteed)
-    .reduce((sum, inv) => sum + (inv.amount || 0), 0)
-  const groupByDay = selectedRange === '7d' || selectedRange === '30d'
-  const prevInvoicesList = prevInvoices || []
-  const prevVolume = prevInvoicesList.reduce((sum, inv) => sum + (inv.amount || 0), 0)
-  const prevFinanced = prevInvoicesList.filter((inv) => inv.is_guaranteed).reduce((sum, inv) => sum + (inv.amount || 0), 0)
+  // 2. Procesar Métricas Globales
+  const clientsList = allClients || []
+  const payersList = allPayers || []
+  const invoicesList = allInvoices || []
 
-  const clientsRangeCount = newClientsInRange || 0
-  const clientsPrevCount = newClientsPrevRange || 0
-  const pendingRangeCount = newPendingInRange || 0
-  const pendingPrevCount = newPendingPrevRange || 0
+  const totalBagValue = clientsList.reduce((sum, c) => sum + (Number(c.total_bag) || 0), 0)
+  const approvedPayers = payersList.filter(p => p.risk_status === 'aprobado')
+  const totalApprovedQuota = approvedPayers.reduce((sum, p) => sum + (Number(p.approved_quota) || 0), 0)
+  const totalApprovedCompanies = approvedPayers.length
 
+  // Facturas
+  const guaranteedInvoices = invoicesList.filter(i => i.is_guaranteed)
+  const totalGuaranteedCount = guaranteedInvoices.length
+  const totalGuaranteedValue = guaranteedInvoices.reduce((sum, i) => sum + (Number(i.amount) || 0), 0)
 
+  // Próximos Vencimientos (Mes en curso)
+  const now = new Date()
+  const currentMonth = now.getMonth()
+  const currentYear = now.getFullYear()
+  
+  const upcomingExpirations = invoicesList.filter(i => {
+    if (i.status === 'pagada') return false
+    const d = new Date(i.due_date)
+    return d.getMonth() === currentMonth && d.getFullYear() === currentYear
+  })
+  const upcomingValue = upcomingExpirations.reduce((sum, i) => sum + (Number(i.amount) || 0), 0)
 
-  const totalsByKey = new Map<string, number>()
-  for (const inv of chartInvoices) {
-    const date = new Date(inv.created_at)
-    const key = groupByDay
-      ? date.toISOString().slice(0, 10)
-      : `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
-    totalsByKey.set(key, (totalsByKey.get(key) || 0) + (inv.amount || 0))
-  }
+  // % Facturas Vencidas
+  const activeInvoices = invoicesList.filter(i => i.status !== 'pagada')
+  const overdueInvoices = activeInvoices.filter(i => i.status === 'vencida')
+  const overduePercent = activeInvoices.length > 0 
+    ? Math.round((overdueInvoices.length / activeInvoices.length) * 100) 
+    : 0
 
-  const sortedKeys = Array.from(totalsByKey.keys()).sort()
-  const chartData = sortedKeys.map((key) => {
-    if (groupByDay) {
-      const [y, m, d] = key.split('-')
-      return { name: `${d}/${m}`, total: totalsByKey.get(key) || 0 }
-    }
+  // 3. Procesar Histórico por Mes (Acumulado)
+  const monthlyData = new Map<string, { bag: number; quota: number }>()
 
-    const [y, m] = key.split('-')
+  // Agrupar por mes
+  clientsList.forEach(c => {
+    const month = new Date(c.created_at).toISOString().slice(0, 7) // YYYY-MM
+    const current = monthlyData.get(month) || { bag: 0, quota: 0 }
+    monthlyData.set(month, { ...current, bag: current.bag + (Number(c.total_bag) || 0) })
+  })
+
+  payersList.filter(p => p.risk_status === 'aprobado').forEach(p => {
+    const month = new Date(p.created_at).toISOString().slice(0, 7)
+    const current = monthlyData.get(month) || { bag: 0, quota: 0 }
+    monthlyData.set(month, { ...current, quota: current.quota + (Number(p.approved_quota) || 0) })
+  })
+
+  const sortedMonths = Array.from(monthlyData.keys()).sort()
+  let runningBag = 0
+  let runningQuota = 0
+
+  const chartData = sortedMonths.map(month => {
+    const data = monthlyData.get(month)!
+    runningBag += data.bag
+    runningQuota += data.quota
+    
+    const [y, m] = month.split('-')
     const date = new Date(Number(y), Number(m) - 1, 1)
     const monthLabel = date.toLocaleString('es-CO', { month: 'short' })
-    return { name: `${monthLabel} ${y}`, total: totalsByKey.get(key) || 0 }
+    
+    return {
+      name: `${monthLabel} ${y}`,
+      bag: runningBag,
+      quota: runningQuota
+    }
   })
 
   const formatCurrency = (amount: number) => 
@@ -157,36 +150,59 @@ export default async function AdminDashboard({
         <p className="mt-1 text-sm text-gray-500">Visión global operativa de AvalIA SaaS.</p>
       </div>
 
-      {/* KPIs Globales */}
+      {/* KPIs Globales - Fila 1 */}
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
         <KpiCard 
           title="Clientes Registrados" 
-          value={clientsRangeCount} 
+          value={clientsList.length} 
           icon={Users} 
           color="blue"
-          trend={{ value: percentDelta(clientsRangeCount, clientsPrevCount), label: `vs periodo anterior (${rangeLabel})`, positive: clientsRangeCount >= clientsPrevCount }}
         />
         <KpiCard 
-          title="Volumen Procesado" 
-          value={formatCurrency(totalVolume)} 
-          icon={TrendingUp} 
+          title="Valor en Bolsa" 
+          value={formatCurrency(totalBagValue)} 
+          icon={Building2} 
           color="purple"
-          trend={{ value: percentDelta(totalVolume, prevVolume), label: `vs periodo anterior (${rangeLabel})`, positive: totalVolume >= prevVolume }}
         />
         <KpiCard 
-          title="Solicitudes Nuevas" 
-          value={pendingRangeCount} 
+          title="Cupos Aprobados" 
+          value={formatCurrency(totalApprovedQuota)} 
+          icon={CreditCard} 
+          color="green"
+        />
+        <KpiCard 
+          title="Empresas Aprobadas" 
+          value={totalApprovedCompanies} 
+          icon={TrendingUp} 
+          color="orange"
+        />
+      </div>
+
+      {/* KPIs Globales - Fila 2 */}
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+        <KpiCard 
+          title="Facturas Aseguradas (#)" 
+          value={totalGuaranteedCount} 
+          icon={FileCheck} 
+          color="blue"
+        />
+        <KpiCard 
+          title="Valor Asegurado" 
+          value={formatCurrency(totalGuaranteedValue)} 
+          icon={CreditCard} 
+          color="green"
+        />
+        <KpiCard 
+          title="Próximos Vencimientos" 
+          value={formatCurrency(upcomingValue)} 
+          icon={Clock} 
+          color="purple"
+        />
+        <KpiCard 
+          title="% Facturas Vencidas" 
+          value={`${overduePercent}%`} 
           icon={Clock} 
           color="red"
-          // Sin trend si es 0
-          trend={{ value: percentDelta(pendingRangeCount, pendingPrevCount), label: `vs periodo anterior (${rangeLabel})`, positive: pendingRangeCount >= pendingPrevCount }}
-        />
-        <KpiCard 
-          title="Monto Total Financiado" 
-          value={formatCurrency(totalFinanced)} 
-          icon={FileCheck} 
-          color="green"
-          trend={{ value: percentDelta(totalFinanced, prevFinanced), label: `vs periodo anterior (${rangeLabel})`, positive: totalFinanced >= prevFinanced }}
         />
       </div>
 
@@ -196,7 +212,7 @@ export default async function AdminDashboard({
         {/* Gráfico de Volumen Global */}
         <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-100 p-6">
           <div className="flex items-center justify-between mb-6">
-            <h3 className="text-lg font-semibold text-gray-900">Volumen Transaccional Global</h3>
+            <h3 className="text-lg font-semibold text-gray-900">Evolución de Bolsa y Cupos</h3>
             <div className="flex items-center gap-2">
               <div className="hidden sm:flex items-center gap-1">
                 {rangeOptions.map((opt) => (
@@ -245,8 +261,8 @@ export default async function AdminDashboard({
             <AdminSystemStatus
               range={selectedRange}
               rangeLabel={rangeLabel}
-              totalClientsCount={clientsCountTotal || 0}
-              totalInvoicesCount={totalInvoicesCount || 0}
+              totalClientsCount={clientsList.length}
+              totalInvoicesCount={invoicesList.length}
             />
         </div>
       </div>

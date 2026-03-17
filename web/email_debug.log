@@ -1,0 +1,20 @@
+[2026-03-17T19:15:23.713Z] Intentando enviar a: operaciones@collectiabpo.com, Asunto: Completa tu Estudio de Credito - Avalia
+[2026-03-17T19:15:24.182Z] Error de Resend: {
+  "statusCode": 401,
+  "name": "validation_error",
+  "message": "API key is invalid"
+}
+[2026-03-17T19:15:24.183Z] Intentando enviar a: bigroomrs@gmail.com, Asunto: Confirmacion de Registro de Pagador - Avalia SaaS
+[2026-03-17T19:15:24.559Z] Error de Resend: {
+  "statusCode": 401,
+  "name": "validation_error",
+  "message": "API key is invalid"
+}
+[2026-03-17T19:20:39.281Z] Intentando enviar a: operaciones@collectiabpo.com, Asunto: Completa tu Estudio de Credito - Avalia (Key length: 36)
+[2026-03-17T19:20:39.759Z] Éxito. ID de mensaje: 4d1046b7-9867-4227-8028-e2acdcc34a0d
+[2026-03-17T19:20:39.761Z] Intentando enviar a: bigroomrs@gmail.com, Asunto: Confirmacion de Registro de Pagador - Avalia SaaS (Key length: 36)
+[2026-03-17T19:20:40.095Z] Éxito. ID de mensaje: d207f23b-43c0-4087-9560-25c7407fe1b7
+[2026-03-17T19:37:38.469Z] Intentando enviar a: operaciones@collectiabpo.com, Asunto: Código de verificación - Collectia BPO y CObranzas (Key length: 36)
+[2026-03-17T19:37:39.028Z] Éxito. ID de mensaje: a833d569-d173-4249-afd0-35d3d3bb3f51
+[2026-03-17T23:21:50.756Z] Intentando enviar a: operaciones@collectiabpo.com, Asunto: Recordatorio: Completa tu Estudio de Credito - Avalia (Key length: 36)
+[2026-03-17T23:21:51.212Z] Éxito. ID de mensaje: 9bc1d4b7-ce61-4ce4-96cf-672731b068ff

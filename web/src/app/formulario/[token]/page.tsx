@@ -2,7 +2,7 @@ import React from 'react'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { Building2, ShieldCheck } from 'lucide-react'
 import { Copyright } from '@/components/ui/Copyright'
-import CreditStudyFormDirect from './CreditStudyFormDirect'
+import PayerDashboard from './PayerDashboard'
 
 interface Props {
     params: Promise<{ token: string }>
@@ -15,7 +15,7 @@ export default async function FormularioPage({ params }: Props) {
     // 1. Validar token directamente (sin auth, sin cookies, sin middleware)
     const { data: payer, error } = await supabaseAdmin
         .from('payers')
-        .select('*')
+        .select('*, solicitor:profiles(full_name)')
         .eq('invitation_token', token)
         .single()
 
@@ -56,38 +56,54 @@ export default async function FormularioPage({ params }: Props) {
         )
     }
 
+    // 2. Obtener documentos ya cargados
+    const { data: documents } = await supabaseAdmin
+        .from('payer_documents')
+        .select('*')
+        .eq('payer_id', payer.id)
+
     return (
-        <div className="min-h-screen bg-[#f8fafc] flex flex-col">
+        <div className="min-h-screen bg-[#f8fafc] flex flex-col font-sans">
             {/* Header */}
-            <header className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
-                <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="flex items-center h-16 gap-3">
-                        <div className="bg-indigo-600 p-2 rounded-lg">
-                            <Building2 className="text-white w-6 h-6" />
+            <header className="bg-white border-b border-slate-200 sticky top-0 z-30">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                    <div className="flex items-center justify-between h-16">
+                        <div className="flex items-center gap-2.5 transition-transform hover:scale-[1.02] cursor-default">
+                            <div className="bg-indigo-600 p-2 rounded-xl shadow-lg shadow-indigo-100">
+                                <Building2 className="text-white w-5 h-5" />
+                            </div>
+                            <div className="flex flex-col">
+                                <span className="text-lg font-black text-slate-900 leading-none tracking-tight">AvalIA</span>
+                                <span className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest mt-0.5">Portal de Pagadores</span>
+                            </div>
                         </div>
-                        <div>
-                            <span className="text-xl font-bold text-slate-900 tracking-tight">AvalIA</span>
-                            <span className="ml-2 text-xs font-bold text-slate-400 uppercase tracking-widest hidden sm:inline">Estudio de Credito</span>
+                        <div className="hidden sm:flex items-center gap-6">
+                            <div className="flex items-center gap-2 text-slate-500 hover:text-indigo-600 transition-colors cursor-pointer group">
+                                <ShieldCheck className="w-4 h-4 group-hover:animate-pulse" />
+                                <span className="text-xs font-bold uppercase tracking-wider">Conexión Segura</span>
+                            </div>
                         </div>
                     </div>
                 </div>
             </header>
 
             {/* Contenido */}
-            <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10 flex-grow w-full">
-                <div className="text-center mb-10">
-                    <h2 className="text-3xl font-bold text-slate-900">Hola, {payer.razon_social}</h2>
-                    <p className="text-slate-500 mt-2">
-                        Completa la siguiente informacion para habilitar tu cupo en AvalIA.
-                    </p>
-                </div>
-
-                <CreditStudyFormDirect token={token} payerNit={payer.nit} />
+            <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 flex-grow w-full">
+                <PayerDashboard token={token} payer={payer} documents={documents || []} />
             </main>
 
             {/* Footer */}
             <footer className="mt-auto border-t border-slate-100 bg-white">
-                <Copyright className="py-8" />
+                <div className="max-w-7xl mx-auto px-4 py-8 flex flex-col md:flex-row items-center justify-between gap-4">
+                    <Copyright />
+                    <div className="flex items-center gap-4 text-xs font-bold text-slate-400 uppercase tracking-widest">
+                        <span>Términos</span>
+                        <span className="w-1 h-1 bg-slate-200 rounded-full"></span>
+                        <span>Privacidad</span>
+                        <span className="w-1 h-1 bg-slate-200 rounded-full"></span>
+                        <span>Soporte</span>
+                    </div>
+                </div>
             </footer>
         </div>
     )

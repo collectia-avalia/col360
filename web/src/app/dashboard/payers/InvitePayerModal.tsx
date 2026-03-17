@@ -78,6 +78,23 @@ export function InvitePayerModal() {
                                             />
                                         </div>
 
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                            <div>
+                                                <label htmlFor="contactName" className="block text-sm font-medium text-gray-700">Nombre de Contacto</label>
+                                                <input type="text" name="contactName" id="contactName" required
+                                                    className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-[#7c3aed] focus:border-[#7c3aed] sm:text-sm py-2 px-3 border"
+                                                    placeholder="Ej: Juan Pérez"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label htmlFor="contactPhone" className="block text-sm font-medium text-gray-700">Celular</label>
+                                                <input type="tel" name="contactPhone" id="contactPhone" required
+                                                    className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-[#7c3aed] focus:border-[#7c3aed] sm:text-sm py-2 px-3 border"
+                                                    placeholder="300 123 4567"
+                                                />
+                                            </div>
+                                        </div>
+
                                         <div>
                                             <label htmlFor="nit" className="block text-sm font-medium text-gray-700">NIT (Opcional)</label>
                                             <input type="text" name="nit" id="nit"

@@ -17,10 +17,11 @@ type PayerRow = {
 export default async function ApprovalsPage({
   searchParams,
 }: {
-  searchParams: { [key: string]: string | string[] | undefined }
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>
 }) {
+  const params = await searchParams
   const supabase = createAdminClient()
-  const statusFilter = (searchParams['status'] as string) || 'pendiente'
+  const statusFilter = (params['status'] as string) || 'pendiente'
 
   // Consultamos pagadores
   // Nota: Intentamos traer datos del perfil del creador.
@@ -36,7 +37,7 @@ export default async function ApprovalsPage({
         company_name
       )
     `)
-    .eq('risk_status', statusFilter)
+    .or(statusFilter === 'pendiente' ? 'risk_status.eq.pendiente,risk_status.eq.en estudio' : `risk_status.eq.${statusFilter}`)
     .order('created_at', { ascending: false })
 
   const tabs = [
@@ -85,8 +86,11 @@ export default async function ApprovalsPage({
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Fecha Solicitud
               </th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Estado
+              </th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Valor Aprobado
               </th>
               <th scope="col" className="relative px-6 py-3">
                 <span className="sr-only">Gestionar</span>
@@ -121,6 +125,12 @@ export default async function ApprovalsPage({
                 <td className="px-6 py-4 whitespace-nowrap">
                   <StatusBadge status={payer.risk_status} />
                 </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                  {payer.risk_status === 'aprobado' 
+                    ? new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format((payer as any).approved_quota || 0)
+                    : '-'
+                  }
+                </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                   <Link 
                     href={`/admin/approvals/${payer.id}`} 
@@ -148,6 +158,7 @@ export default async function ApprovalsPage({
 function StatusBadge({ status }: { status: string }) {
     const styles = {
         pendiente: 'bg-yellow-100 text-yellow-800',
+        'en estudio': 'bg-blue-100 text-blue-800',
         aprobado: 'bg-green-100 text-green-800',
         rechazado: 'bg-red-100 text-red-800',
     }

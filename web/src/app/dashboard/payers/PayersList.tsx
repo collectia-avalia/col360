@@ -18,6 +18,8 @@ interface Payer {
   risk_status: string
   approved_quota: number
   invoices: any[]
+  payer_documents?: any[]
+  signed_at?: string
 }
 
 export function PayersList({ payers }: { payers: Payer[] }) {
@@ -130,6 +132,7 @@ export function PayersList({ payers }: { payers: Payer[] }) {
     const overdueValue = overdueInvoices.reduce((sum: number, inv: any) => sum + (inv.amount || 0), 0)
     const consumedQuota = activeValue + overdueValue // Total consumido (Vigente + Vencido)
     const invoiceCount = (payer.invoices?.length || 0)
+    const docCount = (payer.payer_documents?.length || 0)
 
     return {
       ...payer,
@@ -137,7 +140,8 @@ export function PayersList({ payers }: { payers: Payer[] }) {
         invoiceCount,
         activeValue,
         overdueValue,
-        consumedQuota
+        consumedQuota,
+        docCount
       }
     }
   })
@@ -298,6 +302,9 @@ export function PayersList({ payers }: { payers: Payer[] }) {
               </th>
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Cupo Aprobado
+              </th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Documentos
               </th>
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Consumido

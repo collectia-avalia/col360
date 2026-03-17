@@ -1,9 +1,9 @@
 'use client'
 
 import { useState } from 'react'
-import { Pencil, Trash2, X, AlertCircle, Loader2 } from 'lucide-react'
+import { Pencil, Trash2, X, AlertCircle, Loader2, CheckCircle2, Mail } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { deletePayerAction, updatePayerAction } from '../actions'
+import { deletePayerAction, updatePayerAction, resendPayerInvitationAction } from '../actions'
 
 interface Payer {
     id: string
@@ -20,6 +20,8 @@ export function PayerActions({ payer }: { payer: Payer }) {
     const [isEditModalOpen, setIsEditModalOpen] = useState(false)
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
     const [isLoading, setIsLoading] = useState(false)
+    const [isResending, setIsResending] = useState(false)
+    const [successMessage, setSuccessMessage] = useState<string | null>(null)
     const [error, setError] = useState<string | null>(null)
 
     const handleDelete = async () => {
@@ -48,9 +50,31 @@ export function PayerActions({ payer }: { payer: Payer }) {
         }
     }
 
+    const handleResend = async () => {
+        setIsResending(true)
+        setError(null)
+        setSuccessMessage(null)
+        const res = await resendPayerInvitationAction(payer.id)
+        setIsResending(false)
+        if (res?.error) {
+            setError(res.error)
+        } else {
+            setSuccessMessage(res.message || 'Invitación reenviada correctamente')
+            setTimeout(() => setSuccessMessage(null), 5000)
+        }
+    }
+
     return (
-        <>
+        <div className="flex flex-col items-end gap-2">
             <div className="flex items-center space-x-3">
+                <button
+                    onClick={handleResend}
+                    disabled={isResending}
+                    className="inline-flex items-center px-4 py-2 border border-indigo-200 shadow-sm text-sm font-semibold rounded-lg text-indigo-700 bg-indigo-50 hover:bg-indigo-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all disabled:opacity-50"
+                >
+                    {isResending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Mail className="w-4 h-4 mr-2" />}
+                    Reenviar Estudio
+                </button>
                 <button
                     onClick={() => setIsEditModalOpen(true)}
                     className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors"
@@ -63,13 +87,26 @@ export function PayerActions({ payer }: { payer: Payer }) {
                     className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-lg text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors"
                 >
                     <Trash2 className="w-4 h-4 mr-2" />
-                    Eliminar Cliente
+                    Eliminar
                 </button>
             </div>
 
+            {successMessage && (
+                <div className="text-[10px] font-bold text-green-600 bg-green-50 px-3 py-1 rounded-full border border-green-100 flex items-center animate-in fade-in slide-in-from-right-2">
+                    <CheckCircle2 className="w-3 h-3 mr-1" />
+                    {successMessage}
+                </div>
+            )}
+            {error && !isEditModalOpen && !isDeleteModalOpen && (
+                <div className="text-[10px] font-bold text-red-600 bg-red-50 px-3 py-1 rounded-full border border-red-100 flex items-center animate-in fade-in slide-in-from-right-2">
+                    <AlertCircle className="w-3 h-3 mr-1" />
+                    {error}
+                </div>
+            )}
+
             {/* Edit Modal */}
             {isEditModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm text-left">
                     <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200">
                         <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
                             <h3 className="text-lg font-semibold text-gray-900">Modificar Cliente</h3>
@@ -86,7 +123,7 @@ export function PayerActions({ payer }: { payer: Payer }) {
                                     name="razon_social" 
                                     defaultValue={payer.razon_social}
                                     required
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all text-slate-900"
                                 />
                             </div>
 
@@ -107,12 +144,12 @@ export function PayerActions({ payer }: { payer: Payer }) {
                                     type="email"
                                     defaultValue={payer.contact_email}
                                     required
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all text-slate-900"
                                 />
                             </div>
 
-                            {error && (
-                                <div className="p-3 bg-red-50 text-red-700 text-sm rounded-lg flex items-start">
+                            {error && isEditModalOpen && (
+                                <div className="p-3 bg-red-50 text-red-700 text-sm rounded-lg flex items-start text-left">
                                     <AlertCircle className="w-4 h-4 mr-2 mt-0.5 flex-shrink-0" />
                                     {error}
                                 </div>
@@ -142,7 +179,7 @@ export function PayerActions({ payer }: { payer: Payer }) {
 
             {/* Delete Confirmation Modal */}
             {isDeleteModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm text-left">
                     <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200">
                         <div className="p-6 text-center">
                             <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 mb-4">
@@ -154,7 +191,7 @@ export function PayerActions({ payer }: { payer: Payer }) {
                                 Esta acción no se puede deshacer.
                             </p>
 
-                            {error && (
+                            {error && isDeleteModalOpen && (
                                 <div className="mb-6 p-3 bg-red-50 text-red-700 text-sm rounded-lg text-left">
                                     {error}
                                 </div>
@@ -181,6 +218,6 @@ export function PayerActions({ payer }: { payer: Payer }) {
                     </div>
                 </div>
             )}
-        </>
+        </div>
     )
 }
