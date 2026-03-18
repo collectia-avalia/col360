@@ -3,6 +3,7 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { sendEmail } from '@/lib/actions/email'
 import { headers } from 'next/headers'
+import { revalidatePath } from 'next/cache'
 import crypto from 'crypto'
 
 export async function uploadPayerDocumentAction(formData: FormData) {
@@ -132,6 +133,8 @@ export async function verifySignatureAction(token: string, otp: string) {
             risk_status: 'en estudio'
         })
         .eq('id', payer.id)
+
+    revalidatePath(`/formulario/${token}`)
 
     return { success: true }
 }

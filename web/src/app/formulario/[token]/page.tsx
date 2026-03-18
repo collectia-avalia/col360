@@ -43,10 +43,10 @@ export default async function FormularioPage({ params }: Props) {
                     <div className="bg-green-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto">
                         <ShieldCheck className="text-green-600 w-10 h-10" />
                     </div>
-                    <h2 className="text-2xl font-bold text-slate-900">Estudio Recibido</h2>
+                    <h2 className="text-2xl font-bold text-slate-900">Proceso Finalizado</h2>
                     <p className="text-slate-500">
-                        Ya hemos recibido tu informacion. Nuestro equipo esta evaluando tu solicitud.
-                        Te notificaremos por correo cuando tengamos una respuesta.
+                        Hemos recibido tu firma correctamente. Nuestro equipo está evaluando tu solicitud.
+                        Se te estará dando respuesta vía email.
                     </p>
                     <div className="pt-4 border-t border-slate-100">
                         <Copyright />
