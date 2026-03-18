@@ -138,7 +138,9 @@ export default function PayerDashboard({ token, payer, documents }: PayerDashboa
         setError(result.error)
       } else {
         setMessage('Firma completada exitosamente')
-        router.refresh()
+        setTimeout(() => {
+          window.location.reload()
+        }, 1500)
       }
     })
   }
