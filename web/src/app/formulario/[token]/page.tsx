@@ -4,6 +4,9 @@ import { Building2, ShieldCheck } from 'lucide-react'
 import { Copyright } from '@/components/ui/Copyright'
 import PayerDashboard from './PayerDashboard'
 
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 interface Props {
     params: Promise<{ token: string }>
 }
