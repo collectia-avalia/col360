@@ -8,10 +8,37 @@ type PayerRow = {
   nit: string
   created_at: string
   risk_status: string
+  business_activity?: string | null
+  product_service?: string | null
+  monthly_purchase_value?: number | null
+  signed_at?: string | null
   profiles?: {
     email?: string | null
     company_name?: string | null
   } | null
+  payer_documents?: { doc_type: string }[]
+}
+
+function calculateProgress(payer: PayerRow) {
+  let points = 0
+  const totalPoints = 9
+
+  // 1. Info Fields (3 points)
+  if (payer.business_activity) points++
+  if (payer.product_service) points++
+  if (payer.monthly_purchase_value) points++
+
+  // 2. Documents (5 points)
+  const requiredDocs = ['rut', 'camara_comercio', 'cedula_rep_legal', 'estados_financieros', 'renta']
+  const uploadedTypes = new Set(payer.payer_documents?.map(d => d.doc_type) || [])
+  requiredDocs.forEach(doc => {
+    if (uploadedTypes.has(doc)) points++
+  })
+
+  // 3. Signature (1 point)
+  if (payer.signed_at) points++
+
+  return Math.round((points / totalPoints) * 100)
 }
 
 export default async function ApprovalsPage({
@@ -24,10 +51,6 @@ export default async function ApprovalsPage({
   const statusFilter = (params['status'] as string) || 'pendiente'
 
   // Consultamos pagadores
-  // Nota: Intentamos traer datos del perfil del creador.
-  // Si la relación FK no es detectada automáticamente hacia 'profiles', esto podría no traer datos.
-  // En ese caso, mostraríamos solo el ID o el email si pudiéramos acceder a auth.users (que no podemos desde aquí fácilmente).
-  // Asumiremos que profiles existe y trataremos de hacer el join.
   const { data: payers } = await supabase
     .from('payers')
     .select(`
@@ -35,6 +58,9 @@ export default async function ApprovalsPage({
       profiles:created_by (
         email,
         company_name
+      ),
+      payer_documents (
+        doc_type
       )
     `)
     .or(statusFilter === 'pendiente' ? 'risk_status.eq.pendiente,risk_status.eq.en estudio' : `risk_status.eq.${statusFilter}`)
@@ -84,6 +110,9 @@ export default async function ApprovalsPage({
                 Solicitante (Cliente)
               </th>
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Documentación
+              </th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Fecha Solicitud
               </th>
                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -98,7 +127,9 @@ export default async function ApprovalsPage({
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {(payers as PayerRow[] | null)?.map((payer) => (
+            {(payers as any[] | null)?.map((payer: PayerRow) => {
+              const progress = calculateProgress(payer)
+              return (
               <tr key={payer.id} className="hover:bg-gray-50 transition-colors">
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="flex items-center">
@@ -118,6 +149,19 @@ export default async function ApprovalsPage({
                     {payer.profiles?.company_name || 'Sin Nombre'}
                   </div>
                   <div className="text-xs text-gray-500">{payer.profiles?.email || '...'}</div>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <div className="flex items-center gap-2">
+                    <div className="w-16 bg-gray-100 rounded-full h-1.5 overflow-hidden">
+                      <div 
+                        className={`h-full rounded-full transition-all ${progress === 100 ? 'bg-green-500' : 'bg-indigo-600'}`}
+                        style={{ width: `${progress}%` }}
+                      />
+                    </div>
+                    <span className={`text-xs font-bold ${progress === 100 ? 'text-green-600' : 'text-gray-600'}`}>
+                      {progress}%
+                    </span>
+                  </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                   {new Date(payer.created_at).toLocaleDateString()}
@@ -140,7 +184,7 @@ export default async function ApprovalsPage({
                   </Link>
                 </td>
               </tr>
-            ))}
+            )})}
             {(!payers || payers.length === 0) && (
                 <tr>
                     <td colSpan={5} className="px-6 py-12 text-center text-gray-500">
