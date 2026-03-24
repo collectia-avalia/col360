@@ -38,18 +38,18 @@ export default async function FormularioPage({ params }: Props) {
         )
     }
 
-    // Si el estudio ya fue completado
-    if (payer.risk_status === 'en estudio') {
+    // Si el estudio ya fue completado o firmado
+    if (payer.risk_status === 'en estudio' || payer.signed_at) {
         return (
             <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
                 <div className="max-w-lg w-full bg-white rounded-2xl shadow-xl p-10 text-center space-y-6">
                     <div className="bg-green-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto">
                         <ShieldCheck className="text-green-600 w-10 h-10" />
                     </div>
-                    <h2 className="text-2xl font-bold text-slate-900">Proceso Finalizado</h2>
+                    <h2 className="text-2xl font-bold text-slate-900">Proceso Completado con Éxito</h2>
                     <p className="text-slate-500">
-                        Hemos recibido tu firma correctamente. Nuestro equipo está evaluando tu solicitud.
-                        Se te estará dando respuesta vía email.
+                        Hemos recibido toda tu información y firma correctamente.
+                        Nuestro equipo evaluará la solicitud y <strong>vía correo electrónico te será confirmada la viabilidad del proceso.</strong>
                     </p>
                     <div className="pt-4 border-t border-slate-100">
                         <Copyright />

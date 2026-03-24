@@ -118,21 +118,29 @@ export async function verifySignatureAction(token: string, otp: string) {
     const ip = headerList.get('x-forwarded-for') || '127.0.0.1'
     
     // Generar un Hash único de la firma para mayor tangibilidad
+    // Generar un Hash único (solo para auditoría/log por ahora)
     const signatureHash = crypto.createHash('sha256')
         .update(`${payer.id}-${payer.contact_email}-${new Date().toISOString()}-${ip}`)
         .digest('hex')
         .substring(0, 16)
         .toUpperCase()
 
-    await supabaseAdmin
+    console.log(`[SIGNATURE INFO] ID: ${payer.id}, Hash: ${signatureHash}, IP: ${ip}`)
+
+    const { error: updateError } = await supabaseAdmin
         .from('payers')
         .update({
             signed_at: new Date().toISOString(),
-            signed_ip: ip,
-            signature_hash: signatureHash,
-            risk_status: 'en estudio'
+            signed_ip: ip
+            // signature_hash: signatureHash, // Habilitar cuando la columna exista
+            // risk_status: 'en estudio' // Habilitar cuando el enum sea actualizado
         })
         .eq('id', payer.id)
+
+    if (updateError) {
+        console.error('❌ Error fatal al registrar firma:', updateError)
+        return { error: `Error de base de datos (${updateError.code}): ${updateError.message}` }
+    }
 
     revalidatePath(`/formulario/${token}`)
 
@@ -145,6 +153,14 @@ export async function updatePayerQuestionsAction(formData: FormData) {
     const product_service = formData.get('product_service') as string
     const monthly_purchase_value = formData.get('monthly_purchase_value') as string
     const payment_term = formData.get('payment_term') as string
+    
+    // Additional financial fields
+    const legal_representative = formData.get('legal_representative') as string
+    const commercial_address = formData.get('commercial_address') as string
+    const annual_sales = Number(formData.get('annual_sales')) || 0
+    const total_assets = Number(formData.get('total_assets')) || 0
+    const total_liabilities = Number(formData.get('total_liabilities')) || 0
+    const net_utility = Number(formData.get('net_utility')) || 0
 
     if (!token) return { error: 'Token inválido' }
 
@@ -155,7 +171,13 @@ export async function updatePayerQuestionsAction(formData: FormData) {
             business_activity,
             product_service,
             monthly_purchase_value,
-            payment_term
+            payment_term,
+            legal_representative,
+            commercial_address,
+            annual_sales,
+            total_assets,
+            total_liabilities,
+            net_utility
         })
         .eq('invitation_token', token)
 
