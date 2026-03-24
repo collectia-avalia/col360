@@ -49,18 +49,22 @@ export default async function DashboardPage() {
   const overdueInvoices = allInvoices.filter(inv => getVisualStatus(inv) === 'vencida')
 
   const totalPortfolio = activeInvoices.reduce((sum, inv) => sum + (inv.amount || 0), 0) + overdueInvoices.reduce((sum, inv) => sum + (inv.amount || 0), 0)
-  const guaranteedAmount = allInvoices.filter(inv => inv.is_guaranteed && inv.status !== 'pagada').reduce((sum, inv) => sum + (inv.guaranteed_amount || 0), 0)
+  
+  // Non-revolving: Sum all guaranteed invoices (active + paid) to subtract from bag
+  const totalGuaranteedEver = allInvoices.filter(inv => inv.is_guaranteed).reduce((sum, inv) => sum + (inv.guaranteed_amount || inv.amount || 0), 0)
+  
+  const guaranteedAmount = allInvoices.filter(inv => inv.is_guaranteed && inv.status !== 'pagada').reduce((sum, inv) => sum + (inv.guaranteed_amount || inv.amount || 0), 0)
   const overdueAmount = overdueInvoices.reduce((sum, inv) => sum + (inv.amount || 0), 0)
   const totalRadicado = allInvoices.reduce((sum, inv) => sum + (inv.amount || 0), 0)
   const totalRecaudado = allInvoices.filter(inv => inv.status === 'pagada').reduce((sum, inv) => sum + (inv.amount || 0), 0)
 
-  // Cobertura sobre la Bolsa (según requerimiento: 447k / 5M)
+  // Cobertura sobre la Bolsa
   const coveragePercent = totalBag > 0 ? Math.round((guaranteedAmount / totalBag) * 100) : 0
 
-  // Calculation for Global Quota
-  const availableQuota = Math.max(0, totalBag - guaranteedAmount)
+  // Calculation for Global Quota (Non-revolving)
+  const availableQuota = Math.max(0, totalBag - totalGuaranteedEver)
 
-  // Porcentaje disponible de la bolsa (según requerimiento: (5M-447k)/5M)
+  // Porcentaje disponible de la bolsa
   const availabilityPercent = totalBag > 0 ? Math.round((availableQuota / totalBag) * 100) : 0
 
   // 3. Procesamiento para Gráficos
