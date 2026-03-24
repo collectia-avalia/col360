@@ -90,7 +90,7 @@ export function InvoicesList({ invoices, initialFilterStatus }: { invoices: Invo
 
   // 3. Filtrar para la tabla (Aplicar estado seleccionado)
   const filteredInvoices = contextInvoices.filter(inv => {
-    if (filterStatus === 'todos') return getVisualStatus(inv) !== 'pagada' // 'todos' en dashboard suele ser cartera activa (no pagada)
+    if (filterStatus === 'todos') return true // Show all including pagada if matches search/guarantee
     if (filterStatus === 'pagada') return getVisualStatus(inv) === 'pagada'
     if (filterStatus === 'proximas') {
       // Reutilizar lógica de upcoming

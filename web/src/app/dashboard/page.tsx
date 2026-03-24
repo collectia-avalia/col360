@@ -30,9 +30,12 @@ export default async function DashboardPage() {
     .eq('created_by', user.id)
     .eq('risk_status', 'aprobado')
 
-  const totalBag = profile?.total_bag || 0
   const allInvoices = invoices || []
   const allPayers = payers || []
+
+  // Calculate total bag as sum of approved quotas of payers
+  const approvedPayersQuota = allPayers.reduce((sum, p) => sum + (p.approved_quota || 0), 0)
+  const totalBag = approvedPayersQuota || profile?.total_bag || 0
 
   // 2. Procesamiento de KPIs
   const getVisualStatus = (invoice: any) => {
@@ -51,14 +54,14 @@ export default async function DashboardPage() {
   const totalRadicado = allInvoices.reduce((sum, inv) => sum + (inv.amount || 0), 0)
   const totalRecaudado = allInvoices.filter(inv => inv.status === 'pagada').reduce((sum, inv) => sum + (inv.amount || 0), 0)
 
-  const coveragePercent = totalPortfolio > 0 ? Math.round((guaranteedAmount / totalPortfolio) * 100) : 0
+  // Cobertura sobre la Bolsa (según requerimiento: 447k / 5M)
+  const coveragePercent = totalBag > 0 ? Math.round((guaranteedAmount / totalBag) * 100) : 0
 
   // Calculation for Global Quota
-  // El Cupo Disponible es la Bolsa Total menos lo que ya está garantizado/comprometido
   const availableQuota = Math.max(0, totalBag - guaranteedAmount)
 
-  // Porcentaje de consumo de la bolsa
-  const consumptionPercent = totalBag > 0 ? Math.min(100, Math.round((guaranteedAmount / totalBag) * 100)) : 0
+  // Porcentaje disponible de la bolsa (según requerimiento: (5M-447k)/5M)
+  const availabilityPercent = totalBag > 0 ? Math.round((availableQuota / totalBag) * 100) : 0
 
   // 3. Procesamiento para Gráficos
 
@@ -137,7 +140,7 @@ export default async function DashboardPage() {
             icon={Wallet}
             color="green"
             trend={{
-              value: consumptionPercent,
+              value: availabilityPercent,
               label: `Bolsa Adquirida: ${formatCurrency(totalBag)}`,
               positive: true,
               suffix: '%'
