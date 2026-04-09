@@ -47,6 +47,8 @@ export default function NewInvoiceForm({ payers }: { payers: PayerOption[] }) {
     issueDate?: string
     dueDate?: string
     nit?: string
+    customerName?: string
+    cufe?: string
   } | null>(null)
 
   const [isAnalyzing, setIsAnalyzing] = useState(false)
@@ -73,6 +75,36 @@ export default function NewInvoiceForm({ payers }: { payers: PayerOption[] }) {
 
     if (file.name.toLowerCase().endsWith('.pdf')) {
         setIsPdf(true)
+        try {
+            const apiForm = new FormData()
+            apiForm.append('file', file)
+            const res = await fetch('/api/parse-invoice', { method: 'POST', body: apiForm })
+            if (res.ok) {
+                const data = await res.json()
+                // Buscar pagador por NIT del cliente (deudor)
+                if (data.customerNit) {
+                    const nCustomer = normalizeNit(data.customerNit)
+                    const found = payers.find(p => {
+                        const nP = normalizeNit(p.nit)
+                        return nP === nCustomer ||
+                            (nCustomer.length === nP.length + 1 && nCustomer.startsWith(nP)) ||
+                            (nP.length === nCustomer.length + 1 && nP.startsWith(nCustomer))
+                    })
+                    if (found) setSelectedPayerId(found.id)
+                }
+                setParsedData({
+                    invoiceNumber: data.invoiceNumber,
+                    amount: data.amount ? parseFloat(data.amount) : undefined,
+                    issueDate: data.issueDate,
+                    dueDate: data.dueDate,
+                    nit: data.customerNit,
+                    customerName: data.customerName,
+                    cufe: data.cufe,
+                })
+            }
+        } catch (err) {
+            console.error('Error al extraer PDF:', err)
+        }
         setIsAnalyzing(false)
         setShowFields(true)
         return
@@ -90,44 +122,62 @@ export default function NewInvoiceForm({ payers }: { payers: PayerOption[] }) {
         }
         
         const invoiceNumber = getTagValue('ID') || getTagValue('cbc:ID')
-        const issueDate = getTagValue('IssueDate') || getTagValue('cbc:IssueDate')
-        const dueDate = getTagValue('DueDate') || getTagValue('cbc:DueDate')
+        const issueDate    = getTagValue('IssueDate') || getTagValue('cbc:IssueDate')
+        const dueDate      = getTagValue('DueDate') || getTagValue('cbc:DueDate')
         const payableAmount = getTagValue('PayableAmount') || getTagValue('cbc:PayableAmount')
-        
-        // --- Extracción del NIT del Pagador ---
+        const cufe         = getTagValue('UUID') || getTagValue('cbc:UUID')
+
+        // --- Extracción del NIT y Nombre del Deudor (AccountingCustomerParty) ---
         let payerNit = null
-        
-        // Estrategia 1: AccountingCustomerParty -> PartyTaxScheme -> CompanyID
-        const customerParty = xmlDoc.getElementsByTagName('AccountingCustomerParty')[0] || xmlDoc.getElementsByTagName('cac:AccountingCustomerParty')[0]
+        let customerName = null
+
+        const customerParty = xmlDoc.getElementsByTagName('AccountingCustomerParty')[0]
+                           || xmlDoc.getElementsByTagName('cac:AccountingCustomerParty')[0]
         if (customerParty) {
-            const taxScheme = customerParty.getElementsByTagName('PartyTaxScheme')[0] || customerParty.getElementsByTagName('cac:PartyTaxScheme')[0]
+            // NIT
+            const taxScheme = customerParty.getElementsByTagName('PartyTaxScheme')[0]
+                           || customerParty.getElementsByTagName('cac:PartyTaxScheme')[0]
             if (taxScheme) {
-                const companyID = taxScheme.getElementsByTagName('CompanyID')[0] || taxScheme.getElementsByTagName('cbc:CompanyID')[0]
+                const companyID = taxScheme.getElementsByTagName('CompanyID')[0]
+                               || taxScheme.getElementsByTagName('cbc:CompanyID')[0]
                 if (companyID) payerNit = companyID.textContent
             }
-        }
-        
-        // Match Payer (Lógica Mejorada)
-        if (payerNit) {
-            const nPayerNit = normalizeNit(payerNit)
-            
-            const foundPayer = payers.find(p => {
-                const nP = normalizeNit(p.nit)
-                // Match exacto de base numérica
-                if (nP === nPayerNit) return true
-                // XML tiene dígito extra (posible DV)
-                if (nPayerNit.length === nP.length + 1 && nPayerNit.startsWith(nP)) return true
-                // DB tiene dígito extra (posible DV)
-                if (nP.length === nPayerNit.length + 1 && nP.startsWith(nPayerNit)) return true
-                
-                return false
-            })
-
-            if (foundPayer) {
-                setSelectedPayerId(foundPayer.id)
+            // Fallback NIT por PartyIdentification
+            if (!payerNit) {
+                const partyId = customerParty.getElementsByTagName('PartyIdentification')[0]
+                             || customerParty.getElementsByTagName('cac:PartyIdentification')[0]
+                if (partyId) {
+                    const idEl = partyId.getElementsByTagName('ID')[0]
+                              || partyId.getElementsByTagName('cbc:ID')[0]
+                    if (idEl) payerNit = idEl.textContent
+                }
             }
-        } else {
-            // Estrategia 2: Buscar en todos los CompanyID si alguno coincide con nuestros payers normalizados
+            // Nombre del deudor
+            const partyName = customerParty.getElementsByTagName('PartyName')[0]
+                           || customerParty.getElementsByTagName('cac:PartyName')[0]
+            if (partyName) {
+                const nameEl = partyName.getElementsByTagName('Name')[0]
+                            || partyName.getElementsByTagName('cbc:Name')[0]
+                if (nameEl) customerName = nameEl.textContent?.trim() || null
+            }
+        }
+
+        // --- Match Payer por NIT ---
+        const matchPayer = (nit: string | null) => {
+            if (!nit) return
+            const nNit = normalizeNit(nit)
+            const found = payers.find(p => {
+                const nP = normalizeNit(p.nit)
+                return nP === nNit ||
+                    (nNit.length === nP.length + 1 && nNit.startsWith(nP)) ||
+                    (nP.length === nNit.length + 1 && nP.startsWith(nNit))
+            })
+            if (found) setSelectedPayerId(found.id)
+            return found
+        }
+
+        if (!matchPayer(payerNit)) {
+            // Estrategia 2: buscar en todos los CompanyID
             const allCompanyIDs = Array.from(xmlDoc.getElementsByTagName('CompanyID'))
             for (const cid of allCompanyIDs) {
                 const nCid = normalizeNit(cid.textContent)
@@ -136,7 +186,7 @@ export default function NewInvoiceForm({ payers }: { payers: PayerOption[] }) {
                     return nP === nCid || (nCid.length === nP.length + 1 && nCid.startsWith(nP))
                 })
                 if (found) {
-                    payerNit = cid.textContent // Mantener original para display
+                    payerNit = cid.textContent
                     setSelectedPayerId(found.id)
                     break
                 }
@@ -149,7 +199,9 @@ export default function NewInvoiceForm({ payers }: { payers: PayerOption[] }) {
                 amount: payableAmount ? parseFloat(payableAmount) : undefined,
                 issueDate: issueDate || undefined,
                 dueDate: dueDate || undefined,
-                nit: payerNit || undefined
+                nit: payerNit || undefined,
+                customerName: customerName || undefined,
+                cufe: cufe || undefined,
             })
         }
       } catch (err) {
@@ -332,36 +384,43 @@ export default function NewInvoiceForm({ payers }: { payers: PayerOption[] }) {
             {showFields && (
                 <div className="sm:col-span-2 grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-2 animate-in fade-in slide-in-from-top-4 duration-500">
                     
-                    {isPdf && (
+                    {isPdf && !parsedData && (
                         <div className="sm:col-span-2 bg-yellow-50 p-4 rounded-md flex items-start mb-2">
                             <div className="flex-shrink-0">
                                 <FileText className="h-5 w-5 text-yellow-400" />
                             </div>
                             <div className="ml-3">
-                                <h3 className="text-sm font-medium text-yellow-800">Archivo PDF Cargado</h3>
-                                <div className="mt-2 text-sm text-yellow-700">
-                                    <p>Por favor diligencia los datos de la factura manualmente. No realizamos extracción automática de datos desde PDF.</p>
-                                </div>
+                                <h3 className="text-sm font-medium text-yellow-800">PDF Cargado</h3>
+                                <p className="mt-1 text-sm text-yellow-700">No pudimos extraer datos automáticamente. Por favor diligencia los campos manualmente.</p>
                             </div>
                         </div>
                     )}
 
                     {parsedData && (
-                        <div className="sm:col-span-2 bg-blue-50 p-4 rounded-md flex items-start mb-2">
-                            <div className="flex-shrink-0">
-                                <FileText className="h-5 w-5 text-blue-400" />
+                        <div className="sm:col-span-2 bg-blue-50 border border-blue-200 p-4 rounded-xl mb-2 space-y-2">
+                            <div className="flex items-center gap-2">
+                                <FileText className="h-5 w-5 text-blue-500 flex-shrink-0" />
+                                <h3 className="text-sm font-semibold text-blue-800">
+                                    ✅ Datos extraídos automáticamente
+                                </h3>
                             </div>
-                            <div className="ml-3">
-                                <h3 className="text-sm font-medium text-blue-800">¡Lectura Exitosa!</h3>
-                                <div className="mt-2 text-sm text-blue-700">
-                                    <p>Hemos extraído los datos clave. 
-                                    {parsedData.nit ? (
-                                        <span className="font-bold block mt-1">Pagador identificado por NIT: {parsedData.nit}</span>
-                                    ) : (
-                                        <span className="block mt-1">No encontramos NIT coincidente, selecciona el pagador manualmente.</span>
-                                    )}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 text-xs text-blue-700 pl-7">
+                                {parsedData.customerName && (
+                                    <p><span className="font-semibold">Deudor:</span> {parsedData.customerName}</p>
+                                )}
+                                {parsedData.nit && (
+                                    <p><span className="font-semibold">NIT Deudor:</span> {parsedData.nit}
+                                        {selectedPayerId
+                                            ? <span className="ml-1 text-green-700 font-bold">✓ Pagador identificado</span>
+                                            : <span className="ml-1 text-orange-600"> — Selecciona manualmente</span>
+                                        }
                                     </p>
-                                </div>
+                                )}
+                                {parsedData.cufe && (
+                                    <p className="sm:col-span-2 truncate">
+                                        <span className="font-semibold">CUFE:</span> <span className="font-mono opacity-70">{parsedData.cufe.substring(0,32)}…</span>
+                                    </p>
+                                )}
                             </div>
                         </div>
                     )}
