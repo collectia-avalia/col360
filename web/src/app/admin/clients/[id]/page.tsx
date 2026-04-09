@@ -134,7 +134,7 @@ export default async function EditClientPage({ params }: { params: Promise<{ id:
           <table className="min-w-full divide-y divide-gray-100">
             <thead className="bg-gray-50">
               <tr>
-                {['# Factura', 'Deudor', 'Emisión', 'Vencimiento', 'Valor', 'Estado', 'PDF'].map(h => (
+                {['# Factura', 'Deudor', 'Emisión', 'Vencimiento', 'Valor', 'Días Mora', 'Estado', 'PDF'].map(h => (
                   <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">
                     {h}
                   </th>
@@ -144,12 +144,18 @@ export default async function EditClientPage({ params }: { params: Promise<{ id:
             <tbody className="divide-y divide-gray-50 bg-white">
               {invoicesWithUrls.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="text-center py-10 text-gray-400 text-sm">
+                  <td colSpan={8} className="text-center py-10 text-gray-400 text-sm">
                     Este cliente no tiene facturas registradas.
                   </td>
                 </tr>
               )}
-              {invoicesWithUrls.map((inv) => (
+              {invoicesWithUrls.map((inv) => {
+                const today = new Date()
+                const due   = new Date(inv.due_date)
+                const diasMora = inv.status !== 'pagada' && due < today
+                  ? Math.floor((today.getTime() - due.getTime()) / 86_400_000)
+                  : 0
+                return (
                 <tr key={inv.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-4 py-3 text-sm font-semibold text-gray-900 whitespace-nowrap">
                     {inv.invoice_number}
@@ -165,6 +171,12 @@ export default async function EditClientPage({ params }: { params: Promise<{ id:
                   </td>
                   <td className="px-4 py-3 text-sm font-semibold text-gray-900 whitespace-nowrap">
                     {formatCurrency(Number(inv.amount))}
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    {diasMora > 0
+                      ? <span className="text-xs font-bold text-red-600">{diasMora} días</span>
+                      : <span className="text-xs text-gray-400">—</span>
+                    }
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap">
                     <span className={`text-xs font-medium px-2.5 py-1 rounded-full capitalize ${STATUS_STYLES[inv.status] ?? 'bg-gray-100 text-gray-600'}`}>
@@ -187,7 +199,7 @@ export default async function EditClientPage({ params }: { params: Promise<{ id:
                     )}
                   </td>
                 </tr>
-              ))}
+              )})}
             </tbody>
           </table>
         </div>
