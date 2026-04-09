@@ -9,7 +9,13 @@ const formatCurrency = (val: number) =>
 const STATUS_STYLES: Record<string, string> = {
   vigente: 'bg-green-100 text-green-800',
   vencida: 'bg-red-100 text-red-800',
+  mora:    'bg-red-100 text-red-800',
   pagada:  'bg-gray-100 text-gray-600',
+}
+
+function getDisplayStatus(status: string, diasMora: number): string {
+  if (diasMora > 0 && status !== 'pagada') return 'mora'
+  return status
 }
 
 export default async function EditClientPage({ params }: { params: Promise<{ id: string }> }) {
@@ -179,9 +185,11 @@ export default async function EditClientPage({ params }: { params: Promise<{ id:
                     }
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap">
-                    <span className={`text-xs font-medium px-2.5 py-1 rounded-full capitalize ${STATUS_STYLES[inv.status] ?? 'bg-gray-100 text-gray-600'}`}>
-                      {inv.status}
+                    {(() => { const ds = getDisplayStatus(inv.status, diasMora); return (
+                    <span className={`text-xs font-medium px-2.5 py-1 rounded-full capitalize ${STATUS_STYLES[ds] ?? 'bg-gray-100 text-gray-600'}`}>
+                      {ds}
                     </span>
+                    )})()}
                   </td>
                   <td className="px-4 py-3">
                     {inv.signedUrl ? (
