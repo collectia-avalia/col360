@@ -6,6 +6,7 @@ import fs from 'fs'
 import path from 'path'
 
 const LOG_FILE = path.join(process.cwd(), 'email_debug.log')
+console.log(`[EMAIL_DEBUG] El archivo de log se encuentra en: ${LOG_FILE}`)
 
 function logToFile(message: string) {
     const timestamp = new Date().toISOString()
@@ -45,24 +46,43 @@ export async function sendEmail(params: SendEmailParams) {
         throw new Error('Debes proporcionar contenido HTML o React para el email.')
     }
 
+    const resendApiKey = process.env.RESEND_API_KEY;
+    const keyLength = resendApiKey?.length || 0;
+
     try {
-        const keyLength = process.env.RESEND_API_KEY?.length || 0;
         const logMsg = `Intentando enviar a: ${to}, Asunto: ${subject} (Key length: ${keyLength})`
         console.log(`[EMAIL_DEBUG] ${logMsg}`)
         logToFile(logMsg)
 
-        const { data: result, error } = await resend.emails.send({
+        if (!resendApiKey) {
+            const errorMsg = "ERROR: RESEND_API_KEY no está configurada en las variables de entorno."
+            console.error(`[EMAIL_DEBUG] ${errorMsg}`)
+            logToFile(errorMsg)
+            return { success: false, error: 'Configuración de correo incompleta (Falta API Key).' }
+        }
+
+        const emailPayload: Parameters<typeof resend.emails.send>[0] = {
             from: SENDER_EMAIL,
             to,
             subject,
-            html: html || '',
-            react: react,
-        })
+            ...(react ? { react } : { html: html! }),
+        }
+
+        const { data: result, error } = await resend.emails.send(emailPayload)
 
         if (error) {
             const errorMsg = `Error de Resend: ${JSON.stringify(error, null, 2)}`
             console.error(`[EMAIL_DEBUG] ${errorMsg}`)
             logToFile(errorMsg)
+            
+            // Si el error es sobre el dominio no verificado, dar un mensaje más claro
+            if (error.message?.includes('not verified')) {
+                return { 
+                    success: false, 
+                    error: `El dominio ${SENDER_EMAIL} no está verificado en Resend o estás intentando enviar a una dirección no autorizada en modo demo.` 
+                }
+            }
+            
             return { success: false, error: error.message }
         }
 
@@ -70,8 +90,8 @@ export async function sendEmail(params: SendEmailParams) {
         console.log(`[EMAIL_DEBUG] ${successMsg}`)
         logToFile(successMsg)
         return { success: true, messageId: result?.id }
-    } catch (err) {
-        const unexpectedMsg = `Error inesperado: ${err}`
+    } catch (err: any) {
+        const unexpectedMsg = `Error inesperado: ${err.message || err}`
         console.error(`[EMAIL_DEBUG] ${unexpectedMsg}`)
         logToFile(unexpectedMsg)
         return { success: false, error: 'Ocurrió un error inesperado al enviar el correo.' }

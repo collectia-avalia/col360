@@ -129,6 +129,7 @@ export async function createPayerAction(formData: FormData) {
 
     if (!result.success) {
       console.error('Error enviando email de invitacion:', result.error)
+      return { error: 'El pagador fue creado pero no se pudo enviar el correo de invitación: ' + result.error }
     } else {
       console.log(`[AUDIT] Invitacion enviada a ${contactEmail}`)
     }
@@ -233,6 +234,7 @@ export async function updatePayerAction(formData: FormData) {
 }
 
 export async function resendPayerInvitationAction(payerId: string) {
+  console.log(`[ACTION_DEBUG] Ejecutando resendPayerInvitationAction para PayerID: ${payerId}`)
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
@@ -276,12 +278,12 @@ export async function resendPayerInvitationAction(payerId: string) {
 
     if (!result.success) {
       console.error('Error enviando email:', result.error)
-      return { error: 'Error enviando el correo' }
+      return { error: 'No se pudo enviar el correo: ' + result.error }
     }
 
     return { success: true, message: `Invitación reenviada a ${payer.contact_email}` }
   } catch (err) {
     console.error('Error reenviando invitación:', err)
-    return { error: 'Excepción al enviar el correo' }
+    return { error: 'Excepción al enviar el correo (E-01)' }
   }
 }

@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, Building, ShieldCheck, LogOut, ChevronRight } from 'lucide-react'
+import { LayoutDashboard, Building, ShieldCheck, LogOut, ChevronRight, FileText } from 'lucide-react'
 import { logout } from '@/app/auth/actions'
 import { cn } from '@/lib/utils'
 
@@ -29,6 +29,12 @@ const menuItems = [
     title: 'Aprobaciones',
     href: '/admin/approvals',
     icon: ShieldCheck,
+    matchExact: false
+  },
+  {
+    title: 'Facturas',
+    href: '/admin/invoices',
+    icon: FileText,
     matchExact: false
   }
 ]
