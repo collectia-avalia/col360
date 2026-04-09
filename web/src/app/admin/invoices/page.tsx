@@ -136,6 +136,7 @@ export default async function AdminInvoicesPage() {
                 const diasMora = inv.status !== 'pagada' && due < today
                   ? Math.floor((today.getTime() - due.getTime()) / 86_400_000)
                   : 0
+                const displayStatus = getDisplayStatus(inv.status, diasMora)
                 return (
                 <tr key={inv.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-4 py-3 text-sm font-semibold text-gray-900 whitespace-nowrap">
@@ -163,11 +164,9 @@ export default async function AdminInvoicesPage() {
                     }
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap">
-                    {(() => { const ds = getDisplayStatus(inv.status, diasMora); return (
-                    <span className={`text-xs font-medium px-2.5 py-1 rounded-full capitalize ${STATUS_STYLES[ds] ?? 'bg-gray-100 text-gray-600'}`}>
-                      {ds}
+                    <span className={`text-xs font-medium px-2.5 py-1 rounded-full capitalize ${STATUS_STYLES[displayStatus] ?? 'bg-gray-100 text-gray-600'}`}>
+                      {displayStatus}
                     </span>
-                    )})()}
                   </td>
                   <td className="px-4 py-3">
                     {inv.signedUrl ? (
