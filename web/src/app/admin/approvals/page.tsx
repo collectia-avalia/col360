@@ -21,7 +21,7 @@ type PayerRow = {
 
 function calculateProgress(payer: PayerRow) {
   let points = 0
-  const totalPoints = 9
+  const totalPoints = 10
 
   // 1. Info Fields (3 points)
   if (payer.business_activity) points++
@@ -29,7 +29,7 @@ function calculateProgress(payer: PayerRow) {
   if (payer.monthly_purchase_value) points++
 
   // 2. Documents (5 points)
-  const requiredDocs = ['rut', 'camara_comercio', 'cedula_rep_legal', 'estados_financieros', 'renta']
+  const requiredDocs = ['rut', 'camara_comercio', 'cedula_rep_legal', 'balance', 'pyg', 'renta']
   const uploadedTypes = new Set(payer.payer_documents?.map(d => d.doc_type) || [])
   requiredDocs.forEach(doc => {
     if (uploadedTypes.has(doc)) points++

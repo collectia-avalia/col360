@@ -4,7 +4,7 @@ import { createClientAction } from '../actions'
 import { useFormStatus } from 'react-dom'
 import { useState } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, Loader2, Building, Mail, Lock, FileText, Wallet } from 'lucide-react'
+import { ArrowLeft, Loader2, Building, Mail, Lock, FileText, Wallet, TrendingUp } from 'lucide-react'
 
 function SubmitButton() {
   const { pending } = useFormStatus()
@@ -34,6 +34,7 @@ export default function NewClientPage() {
     email?: string[]
     password?: string[]
     totalBag?: string[]
+    maxExposure?: string[]
     root?: string[]
   } | null>(null)
 
@@ -130,6 +131,34 @@ export default function NewClientPage() {
               </div>
               {serverError?.totalBag && (
                 <p className="mt-1 text-sm text-red-600">{serverError.totalBag[0]}</p>
+              )}
+            </div>
+
+            {/* Exposición Máxima */}
+            <div>
+              <label htmlFor="maxExposure" className="block text-sm font-medium text-gray-700">
+                Exposición Máxima (%)
+              </label>
+              <div className="mt-1 relative rounded-md shadow-sm">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <TrendingUp className="h-5 w-5 text-gray-400" aria-hidden="true" />
+                </div>
+                <input
+                  type="number"
+                  name="maxExposure"
+                  id="maxExposure"
+                  required
+                  min="0"
+                  max="100"
+                  step="0.1"
+                  defaultValue="100"
+                  className="focus:ring-indigo-500 focus:border-indigo-500 block w-full pl-10 sm:text-sm border-gray-300 rounded-md py-2 border"
+                  placeholder="Ej: 10"
+                />
+              </div>
+              <p className="mt-1 text-xs text-gray-500">Porcentaje máximo de la bolsa que se puede asignar a un solo pagador.</p>
+              {serverError?.maxExposure && (
+                <p className="mt-1 text-sm text-red-600">{serverError.maxExposure[0]}</p>
               )}
             </div>
 

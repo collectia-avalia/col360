@@ -53,6 +53,9 @@ export default async function ClientsPage() {
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Fecha Registro
               </th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Exp. Máxima
+              </th>
               <th scope="col" className="relative px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-24">
                 Acciones
               </th>
@@ -91,6 +94,9 @@ export default async function ClientsPage() {
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                   {new Date(client.created_at).toLocaleDateString()}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium text-center">
+                  {client.max_exposure || 100}%
                 </td>
                 <td className="px-4 py-4 whitespace-nowrap text-center text-sm font-medium">
                   <ClientActions userId={client.id} />

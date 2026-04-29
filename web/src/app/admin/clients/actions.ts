@@ -14,6 +14,7 @@ const createClientSchema = z.object({
   email: z.string().email('Email inválido'),
   password: z.string().min(6, 'La contraseña debe tener al menos 6 caracteres'),
   totalBag: z.coerce.number().min(0, 'El valor de la bolsa debe ser positivo'),
+  maxExposure: z.coerce.number().min(0).max(100).default(100),
 })
 
 export async function createClientAction(formData: FormData) {
@@ -25,6 +26,7 @@ export async function createClientAction(formData: FormData) {
     email: formData.get('email'),
     password: formData.get('password'),
     totalBag: formData.get('totalBag'),
+    maxExposure: formData.get('maxExposure'),
   }
 
   const validation = createClientSchema.safeParse(rawData)
@@ -33,7 +35,7 @@ export async function createClientAction(formData: FormData) {
     return { error: validation.error.flatten().fieldErrors }
   }
 
-  const { email, password, companyName, nit, totalBag } = validation.data
+  const { email, password, companyName, nit, totalBag, maxExposure } = validation.data
 
   // 1. Crear usuario en Auth
   const { data: user, error: authError } = await adminSupabase.auth.admin.createUser({
@@ -44,6 +46,7 @@ export async function createClientAction(formData: FormData) {
       company_name: companyName,
       nit: nit,
       total_bag: totalBag,
+      max_exposure: maxExposure,
       role: 'client' // Aunque el trigger lo pone por defecto, aseguramos metadata
     }
   })
@@ -56,17 +59,44 @@ export async function createClientAction(formData: FormData) {
     return { error: { root: ['Error inesperado al crear usuario'] } }
   }
 
-  // 2. El trigger 'handle_new_user' crea el perfil automáticamente.
-  // Opcional: Si el trigger no guardara el NIT, haríamos un update aquí.
-  // Pero asumiremos que el trigger es básico (solo company_name) y haremos un update por si acaso
-  // para guardar el NIT u otros datos específicos si la tabla profiles los tiene.
-  // En nuestro schema actual, profiles no tiene NIT (lo tiene payers).
-  // REVISIÓN SCHEMA: profiles tiene: id, email, company_name, role.
-  // El NIT es de la empresa deudora (payers), no del cliente (profiles) necesariamente, 
-  // O ¿el cliente también tiene NIT? 
-  // En el prompt FASE 0, 'profiles' NO tiene NIT. 'payers' SÍ.
-  // Sin embargo, es lógico que el Cliente (Empresa usuaria del SaaS) tenga NIT.
-  // Si no está en la tabla, no podemos guardarlo. Lo dejaremos en user_metadata.
+  // 2. Verificar si el perfil se creó automáticamente (vía trigger)
+  // Agregamos un pequeño reintento o verificación directa para evitar fallos silenciosos
+  const { data: profile } = await adminSupabase
+    .from('profiles')
+    .select('id')
+    .eq('id', user.user.id)
+    .single()
+
+  if (!profile) {
+    console.log(`[AUDIT] Trigger falló para ${email}. Creando perfil manualmente...`)
+    const { error: profileError } = await adminSupabase
+      .from('profiles')
+      .insert({
+        id: user.user.id,
+        email: email,
+        company_name: companyName,
+        role: 'client',
+        nit: nit,
+        total_bag: totalBag,
+        max_exposure: maxExposure
+      })
+
+    if (profileError) {
+      console.error('Error crítico: No se pudo crear ni el perfil manual:', profileError)
+      // Opcional: Podríamos borrar el usuario de Auth aquí, pero es mejor dejarlo para debugging
+    }
+  } else {
+    // Si el perfil existe pero queremos asegurar que campos como NIT o bolsa estén actualizados
+    // (por si el trigger es una versión antigua que no los incluía)
+    await adminSupabase
+      .from('profiles')
+      .update({
+        nit: nit,
+        total_bag: totalBag,
+        max_exposure: maxExposure
+      })
+      .eq('id', user.user.id)
+  }
 
   // 3. Enviar Correo de Bienvenida con Credenciales
   // Construir la URL base dinámicamente o desde variables de entorno

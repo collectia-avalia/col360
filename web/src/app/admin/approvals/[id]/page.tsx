@@ -125,8 +125,8 @@ export default async function ApprovalDetailPage({ params }: { params: Promise<{
                     />
                     <CheckItem 
                       label="Documentos Cargados" 
-                      isDone={docsWithUrls.length >= 5} 
-                      sub={`(${docsWithUrls.length}/5)`}
+                      isDone={docsWithUrls.length >= 6} 
+                      sub={`(${docsWithUrls.length}/6)`}
                     />
                     <CheckItem 
                       label="Firma Electrónica" 

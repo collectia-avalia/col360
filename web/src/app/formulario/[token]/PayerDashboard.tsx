@@ -45,7 +45,8 @@ export default function PayerDashboard({ token, payer, documents }: PayerDashboa
     { id: 'rut', label: 'RUT', description: 'Registro Único Tributario actualizado', status: 'pending' },
     { id: 'camara_comercio', label: 'Cámara de Comercio', description: 'Certificado no mayor a 30 días', status: 'pending' },
     { id: 'cedula_rep_legal', label: 'Cédula Representante', description: 'Cédula de ciudadanía legible (150%)', status: 'pending' },
-    { id: 'estados_financieros', label: 'Estados Financieros', description: 'Balance y P&G de los últimos 2 años', status: 'pending' },
+    { id: 'balance', label: 'Balance General', description: 'Balance de los últimos 2 años', status: 'pending' },
+    { id: 'pyg', label: 'Estado de P&G', description: 'Estado de Resultados de los últimos 2 años', status: 'pending' },
     { id: 'renta', label: 'Declaración de Renta', description: 'Último periodo gravable declarado', status: 'pending' },
   ]
 
@@ -215,7 +216,7 @@ export default function PayerDashboard({ token, payer, documents }: PayerDashboa
           <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Bienvenido, {payer.razon_social}</h1>
           <p className="text-slate-500 flex items-center gap-2">
             Debida diligencia solicitada por: <span className="font-bold text-indigo-600">{solicitorName}</span>
-            <span className="text-[10px] bg-slate-100 px-2 py-0.5 rounded text-slate-400 font-mono">v2.1</span>
+            <span className="text-[10px] bg-slate-100 px-2 py-0.5 rounded text-slate-400 font-mono">v2.2</span>
           </p>
         </div>
         <div className="flex items-center gap-4 bg-slate-50 p-4 rounded-xl border border-slate-100 relative z-10">

@@ -38,7 +38,8 @@ export async function submitCreditStudyAction(formData: FormData) {
     const files = [
         { type: 'rut', file: formData.get('file_rut') as File },
         { type: 'camara_comercio', file: formData.get('file_camara') as File },
-        { type: 'estados_financieros', file: formData.get('file_financieros') as File }
+        { type: 'balance', file: formData.get('file_balance') as File },
+        { type: 'pyg', file: formData.get('file_pyg') as File }
     ]
 
     for (const item of files) {

@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls -la /c/Users/c_pal/Antigravity/AVALIA/web/.vercel* /c/Users/c_pal/Antigravity/AVALIA/web/Dockerfile)",
+      "Bash(npx tsx:*)",
+      "Bash(node -e ':*)",
+      "Read(//c/Users/c_pal/AppData/Roaming/Claude/local-agent-mode-sessions/skills-plugin/5a08e00b-48cf-47a1-9c96-5d07ffbbb510/ac420868-09cf-4400-a075-89921021427c/skills/pdf/**)",
+      "Bash(python -c ':*)",
+      "Bash(pip install:*)",
+      "Bash(node -e \"require\\('pdf-parse'\\); console.log\\('ok'\\)\")",
+      "Bash(npm run:*)",
+      "Bash(python -c \"import sys,json; p=json.load\\(sys.stdin\\); print\\('main:', p.get\\('main'\\)\\); print\\('exports:', p.get\\('exports','none'\\)\\)\")",
+      "Bash(node -e \"const p = require\\('C:/Users/c_pal/Antigravity/AVALIA/web/node_modules/pdf-parse/dist/pdf-parse/cjs/index.cjs'\\); console.log\\(Object.keys\\(p\\)\\)\")",
+      "Bash(node -e \"const p = require\\('C:/Users/c_pal/Antigravity/AVALIA/web/node_modules/pdf-parse/package.json'\\); console.log\\('version:', p.version\\)\")",
+      "Bash(npm uninstall:*)",
+      "Bash(npm install:*)"
+    ]
+  }
+}

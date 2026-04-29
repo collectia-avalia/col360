@@ -54,7 +54,9 @@ export function PayerActions({ payer }: { payer: Payer }) {
         setIsResending(true)
         setError(null)
         setSuccessMessage(null)
+        console.log(`[CLIENT_DEBUG] Llamando a resendPayerInvitationAction para el payer ${payer.id}`)
         const res = await resendPayerInvitationAction(payer.id)
+        console.log(`[CLIENT_DEBUG] Respuesta recibida:`, res)
         setIsResending(false)
         if (res?.error) {
             setError(res.error)
