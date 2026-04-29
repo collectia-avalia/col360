@@ -41,6 +41,7 @@ export async function updateClientAction(userId: string, formData: FormData) {
     const companyName = formData.get('companyName') as string
     const email = formData.get('email') as string
     const totalBag = Number(formData.get('totalBag'))
+    const maxExposure = Number(formData.get('maxExposure'))
 
     try {
         // 1. Actualizar Auth (Email) si cambió
@@ -58,7 +59,8 @@ export async function updateClientAction(userId: string, formData: FormData) {
             .update({
                 company_name: companyName,
                 email: email,
-                total_bag: totalBag
+                total_bag: totalBag,
+                max_exposure: maxExposure
             }) // Sincronizamos email y bolsa en profile
             .eq('id', userId)
 

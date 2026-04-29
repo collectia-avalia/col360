@@ -11,6 +11,7 @@ interface ClientData {
   company_name: string | null
   email: string | null
   total_bag?: number | null
+  max_exposure?: number | null
 }
 
 export default function EditClientForm({ client }: { client: ClientData }) {
@@ -69,20 +70,41 @@ export default function EditClientForm({ client }: { client: ClientData }) {
           </p>
         </div>
         {/* Valor de la Bolsa */}
-        <div>
-          <label htmlFor="totalBag" className="block text-sm font-medium text-gray-700">Valor de la Bolsa (Cupo Global)</label>
-          <div className="mt-1">
-            <input
-              type="number"
-              name="totalBag"
-              id="totalBag"
-              defaultValue={client.total_bag || 0}
-              min="0"
-              step="0.01"
-              className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md py-2 px-3 border"
-              placeholder="Ej: 15000000"
-              required
-            />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+          <div>
+            <label htmlFor="totalBag" className="block text-sm font-medium text-gray-700">Valor de la Bolsa (Cupo Global)</label>
+            <div className="mt-1">
+              <input
+                type="number"
+                name="totalBag"
+                id="totalBag"
+                defaultValue={client.total_bag || 0}
+                min="0"
+                step="0.01"
+                className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md py-2 px-3 border"
+                placeholder="Ej: 15000000"
+                required
+              />
+            </div>
+          </div>
+
+          <div>
+            <label htmlFor="maxExposure" className="block text-sm font-medium text-gray-700">Exposición Máxima (%)</label>
+            <div className="mt-1">
+              <input
+                type="number"
+                name="maxExposure"
+                id="maxExposure"
+                defaultValue={client.max_exposure || 100}
+                min="0"
+                max="100"
+                step="0.1"
+                className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md py-2 px-3 border font-bold text-indigo-600"
+                placeholder="Ej: 10"
+                required
+              />
+            </div>
+            <p className="mt-1 text-xs text-gray-500">Tope máximo de cupo por cada pagador.</p>
           </div>
         </div>
 
