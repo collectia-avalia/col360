@@ -7,11 +7,11 @@ export default async function ClientsPage() {
   const supabase = createAdminClient()
 
   // DIAGNÓSTICO: Consulta filtrada correctamente
-  // Filtramos por role='client' explícitamente para no mostrar al superadmin
+  // Filtramos por role='superadmin' explícitamente para no mostrar al admin
   const { data: clients, error } = await supabase
     .from('profiles')
     .select('*')
-    .eq('role', 'client')
+    .eq('role', 'superadmin')
     .order('created_at', { ascending: false })
 
   if (error) {

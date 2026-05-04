@@ -62,7 +62,7 @@ export default async function AdminDashboard({
     { data: allPayers },
     { data: allInvoices },
   ] = await Promise.all([
-    supabase.from('profiles').select('id, company_name, total_bag, created_at').eq('role', 'client'),
+    supabase.from('profiles').select('id, company_name, total_bag, created_at').eq('role', 'superadmin'),
     supabase.from('payers').select('*', { count: 'exact', head: true }).eq('risk_status', 'pendiente'),
     supabase.from('payers').select('approved_quota, created_at, risk_status'),
     supabase.from('invoices').select('amount, created_at, is_guaranteed, status, due_date'),
