@@ -56,16 +56,19 @@ export async function getUserProfile(supabase: SupabaseClient) {
         .single()
 
     if (error || !profile) {
-        console.error('[PERFIL] Error obteniendo perfil:', error)
+        console.error('[PERFIL] Error obteniendo perfil para ID:', user.id, error)
         // Intentar reparación si no existe
         const repair = await ensureUserProfile(supabase, user.id)
         if (repair.success) {
-            // Re-intento recursivo (con precaución)
             const { data: rep } = await supabase.from('profiles').select('*, companies(*)').eq('id', user.id).single()
+            console.log('[PERFIL] Perfil recuperado tras reparacion:', rep?.role)
             return rep
         }
         return null
     }
+
+    console.log('[PERFIL] Perfil cargado exitosamente para:', user.email, 'Rol:', profile.role)
+    return profile
 
     return profile
 }

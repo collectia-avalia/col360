@@ -56,28 +56,24 @@ export async function updateSession(request: NextRequest) {
     // Esto evita consultas a BD bloqueadas por RLS en el middleware
     const metadataRole = user.user_metadata?.role
 
-    // Fallback: Si no está en metadata, intentar DB (aunque puede fallar por RLS)
+    // NUEVA ESTRATEGIA: Priorizar DB para evitar metadatos viejos
     let dbRole = null
-    if (!metadataRole) {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', user.id)
-        .single()
-      dbRole = profile?.role
-    }
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+    dbRole = profile?.role
 
-    const role = metadataRole || dbRole || 'client'
+    const role = dbRole || metadataRole || 'client'
 
     // DEBUG LOGS
-    console.log(`[Middleware] Usuario: ${user.email}`)
-    console.log(`[Middleware] Path: ${request.nextUrl.pathname}`)
-    console.log(`[Middleware] Rol Detectado: ${role} (Meta: ${metadataRole}, DB: ${dbRole})`)
+    console.log(`[Middleware] Usuario: ${user.email} | Rol: ${role}`)
 
     // Si intenta ir a login estando logueado, redirigir a su home
     if (request.nextUrl.pathname.startsWith('/login')) {
       let target = '/dashboard'
-      if (role === 'superadmin') target = '/admin'
+      if (role === 'admin') target = '/admin'
       if (role === 'payer_guest') target = '/portal'
 
       const url = request.nextUrl.clone()
@@ -87,7 +83,7 @@ export async function updateSession(request: NextRequest) {
 
     // Protección de rutas específicas
     if (request.nextUrl.pathname.startsWith('/admin')) {
-      if (role !== 'superadmin') {
+      if (role !== 'admin') {
         console.log(`[Middleware] Bloqueando acceso a /admin para rol ${role}`)
         const url = request.nextUrl.clone()
         url.pathname = '/dashboard'
@@ -96,8 +92,8 @@ export async function updateSession(request: NextRequest) {
     }
 
     if (request.nextUrl.pathname.startsWith('/dashboard')) {
-      if (role === 'superadmin') {
-        console.log(`[Middleware] Redirigiendo Superadmin de /dashboard a /admin`)
+      if (role === 'admin') {
+        console.log(`[Middleware] Redirigiendo Admin Global de /dashboard a /admin`)
         const url = request.nextUrl.clone()
         url.pathname = '/admin'
         return NextResponse.redirect(url)
@@ -113,7 +109,7 @@ export async function updateSession(request: NextRequest) {
     // Redirigir raíz a dashboard correspondiente
     if (request.nextUrl.pathname === '/') {
       let target = '/dashboard'
-      if (role === 'superadmin') target = '/admin'
+      if (role === 'admin') target = '/admin'
       if (role === 'payer_guest') target = '/portal'
 
       const url = request.nextUrl.clone()
