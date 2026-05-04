@@ -12,9 +12,38 @@ export const revalidate = 0
 
 export default async function DashboardPage() {
   const supabase = await createClient()
-  const profile = await getUserProfile(supabase)
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  
+  if (!user) {
+    return (
+      <div className="p-8 text-red-600">
+        <h3>Error de Autenticación</h3>
+        <p>No se pudo obtener el usuario de la sesión.</p>
+        <pre>{JSON.stringify(authError, null, 2)}</pre>
+      </div>
+    )
+  }
 
-  if (!profile) return <div className="p-8">Cargando sesión...</div>
+  const { data: directProfile, error: directError } = await supabase
+    .from('profiles')
+    .select('*, companies(*)')
+    .eq('id', user.id)
+    .single()
+
+  if (directError || !directProfile) {
+    return (
+      <div className="p-8 text-red-600 bg-red-50 rounded-lg m-8">
+        <h3 className="font-bold text-lg mb-2">Error cargando perfil desde DB</h3>
+        <p><strong>ID Usuario:</strong> {user.id}</p>
+        <p><strong>Email:</strong> {user.email}</p>
+        <div className="mt-4 p-4 bg-white rounded border border-red-200">
+          <pre className="text-sm overflow-auto">{JSON.stringify(directError || 'Perfil no encontrado (null)', null, 2)}</pre>
+        </div>
+      </div>
+    )
+  }
+
+  const profile = directProfile
 
   const { data: invoices } = await supabase
     .from('invoices')
