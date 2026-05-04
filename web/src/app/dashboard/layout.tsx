@@ -2,6 +2,9 @@ import { createClient } from '@/lib/supabase/server'
 import { getUserProfile } from '@/lib/supabase/profile'
 import { DashboardLayoutWrapper } from '@/components/layouts/DashboardLayoutWrapper'
 
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 export default async function DashboardLayout({
   children,
 }: {

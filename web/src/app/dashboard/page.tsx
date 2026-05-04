@@ -7,6 +7,9 @@ import { InvoiceChart } from '@/components/dashboard/InvoiceChart'
 import { StatusDistributionChart } from '@/components/dashboard/StatusDistributionChart'
 import { ExportButton } from '@/components/ui/ExportButton'
 
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 export default async function DashboardPage() {
   const supabase = await createClient()
   const profile = await getUserProfile(supabase)
