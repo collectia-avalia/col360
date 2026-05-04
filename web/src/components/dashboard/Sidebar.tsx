@@ -15,12 +15,12 @@ export function DashboardSidebar({ role }: SidebarProps) {
   const pathname = usePathname()
 
   const allLinks = [
-    { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['superadmin', 'comercial', 'cartera', 'client'] },
-    { href: '/dashboard/payers', label: 'Clientes', icon: UserSearch, roles: ['superadmin', 'comercial'] },
-    { href: '/dashboard/invoices', label: 'Facturas', icon: UploadCloud, roles: ['superadmin', 'cartera'] },
-    { href: '/dashboard/profile', label: 'Configuración', icon: Settings, roles: ['superadmin', 'comercial', 'cartera', 'client'] },
-    // Nueva sección para gestión de usuarios solo para superadmin
-    { href: '/dashboard/settings/users', label: 'Equipo', icon: Settings, roles: ['superadmin'] },
+    { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['superadmin', 'comercial', 'cartera', 'client', 'admin'] },
+    { href: '/dashboard/payers', label: 'Clientes', icon: UserSearch, roles: ['superadmin', 'comercial', 'admin'] },
+    { href: '/dashboard/invoices', label: 'Facturas', icon: UploadCloud, roles: ['superadmin', 'cartera', 'admin'] },
+    { href: '/dashboard/profile', label: 'Configuración', icon: Settings, roles: ['superadmin', 'comercial', 'cartera', 'client', 'admin'] },
+    // Nueva sección para gestión de usuarios solo para superadmin y global admin
+    { href: '/dashboard/settings/users', label: 'Equipo', icon: Settings, roles: ['superadmin', 'admin'] },
   ]
 
   const links = allLinks.filter(link => !link.roles || (role && link.roles.includes(role)))

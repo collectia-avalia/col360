@@ -69,7 +69,7 @@ export function DashboardLayoutWrapper({ children, email, initial, fullName, com
                 email={email} 
                 initial={initial} 
                 fullName={fullName}
-                role={role === 'superadmin' ? 'Superadmin' : role === 'comercial' ? 'Comercial' : role === 'cartera' ? 'Cartera' : 'Cliente'}
+                role={role === 'superadmin' ? 'Superadmin' : role === 'comercial' ? 'Comercial' : role === 'cartera' ? 'Cartera' : role === 'admin' ? 'Administrador' : 'Cliente'}
                 basePath="/dashboard"
               />
             </div>
