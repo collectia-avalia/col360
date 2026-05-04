@@ -3,7 +3,7 @@
 import React from 'react'
 
 import { createClient } from '@/lib/supabase/server'
-import { ensureUserProfile } from '@/lib/supabase/profile'
+import { ensureUserProfile, getUserProfile } from '@/lib/supabase/profile'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { z } from 'zod'
@@ -33,8 +33,14 @@ export async function createPayerAction(formData: FormData) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  if (!user) {
-    return { error: 'No autorizado' }
+  if (!user) return { error: 'No autenticado' }
+
+  const profile = await getUserProfile(supabase)
+  if (!profile) return { error: 'No autorizado' }
+
+  // 0. Validar Rol
+  if (profile.role !== 'superadmin' && profile.role !== 'comercial') {
+    return { error: 'No tienes permisos para crear pagadores (Requiere rol Superadmin o Comercial)' }
   }
 
   // 1. Validar Datos Basicos
@@ -61,7 +67,7 @@ export async function createPayerAction(formData: FormData) {
       .from('payers')
       .select('id, razon_social')
       .eq('nit', nit)
-      .eq('created_by', user.id)
+      .eq('company_id', profile.company_id)
       .maybeSingle()
 
     if (existingPayer) {
@@ -91,7 +97,8 @@ export async function createPayerAction(formData: FormData) {
       contact_name: contactName,
       contact_phone: contactPhone,
       contact_email: contactEmail,
-      created_by: user.id,
+      created_by: profile.id,
+      company_id: profile.company_id,
       risk_status: 'pendiente',
       invitation_status: 'sent',
       invitation_token: invitationToken,
@@ -162,9 +169,12 @@ export async function createPayerAction(formData: FormData) {
 
 export async function deletePayerAction(payerId: string) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const profile = await getUserProfile(supabase)
+  if (!profile) return { error: 'No autorizado' }
 
-  if (!user) return { error: 'No autorizado' }
+  if (profile.role !== 'superadmin') {
+    return { error: 'Solo el Superadmin puede eliminar clientes' }
+  }
 
   const { count, error: countError } = await supabase
     .from('invoices')
@@ -184,7 +194,7 @@ export async function deletePayerAction(payerId: string) {
     .from('payers')
     .delete()
     .eq('id', payerId)
-    .eq('created_by', user.id)
+    .eq('company_id', profile.company_id)
 
   if (error) {
     console.error('Error eliminando pagador:', error)
@@ -197,9 +207,12 @@ export async function deletePayerAction(payerId: string) {
 
 export async function updatePayerAction(formData: FormData) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const profile = await getUserProfile(supabase)
+  if (!profile) return { error: 'No autorizado' }
 
-  if (!user) return { error: 'No autorizado' }
+  if (profile.role !== 'superadmin' && profile.role !== 'comercial') {
+    return { error: 'No tienes permisos para editar clientes' }
+  }
 
   const rawFormData = {
     id: formData.get('id')?.toString(),
@@ -222,7 +235,7 @@ export async function updatePayerAction(formData: FormData) {
     .from('payers')
     .update(dataToUpdate)
     .eq('id', id)
-    .eq('created_by', user.id)
+    .eq('company_id', profile.company_id)
 
   if (error) {
     console.error('Error actualizando pagador:', error)
@@ -234,11 +247,17 @@ export async function updatePayerAction(formData: FormData) {
 }
 
 export async function resendPayerInvitationAction(payerId: string) {
-  console.log(`[ACTION_DEBUG] Ejecutando resendPayerInvitationAction para PayerID: ${payerId}`)
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  if (!user) return { error: 'No autorizado' }
+  if (!user) return { error: 'No autenticado' }
+
+  const profile = await getUserProfile(supabase)
+  if (!profile) return { error: 'No autorizado' }
+
+  if (profile.role !== 'superadmin' && profile.role !== 'comercial') {
+    return { error: 'No tienes permisos para reenviar invitaciones' }
+  }
 
   // 1. Obtener datos del pagador
   const { data: payer, error: fetchError } = await supabase

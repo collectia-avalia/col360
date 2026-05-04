@@ -37,6 +37,17 @@ export async function createClientAction(formData: FormData) {
 
   const { email, password, companyName, nit, totalBag, maxExposure } = validation.data
 
+  // 0. Crear Empresa
+  const { data: company, error: companyError } = await adminSupabase
+    .from('companies')
+    .insert({ name: companyName, nit: nit })
+    .select()
+    .single()
+
+  if (companyError || !company) {
+    return { error: { root: ['Error creando la empresa: ' + companyError?.message] } }
+  }
+
   // 1. Crear usuario en Auth
   const { data: user, error: authError } = await adminSupabase.auth.admin.createUser({
     email,
@@ -47,7 +58,8 @@ export async function createClientAction(formData: FormData) {
       nit: nit,
       total_bag: totalBag,
       max_exposure: maxExposure,
-      role: 'client' // Aunque el trigger lo pone por defecto, aseguramos metadata
+      role: 'superadmin', // El primer usuario es siempre superadmin
+      company_id: company.id
     }
   })
 
@@ -75,10 +87,11 @@ export async function createClientAction(formData: FormData) {
         id: user.user.id,
         email: email,
         company_name: companyName,
-        role: 'client',
+        role: 'superadmin',
         nit: nit,
         total_bag: totalBag,
-        max_exposure: maxExposure
+        max_exposure: maxExposure,
+        company_id: company.id
       })
 
     if (profileError) {

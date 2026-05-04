@@ -12,9 +12,10 @@ interface DashboardLayoutWrapperProps {
   initial: string
   fullName: string
   companyName: string
+  role?: string
 }
 
-export function DashboardLayoutWrapper({ children, email, initial, fullName, companyName }: DashboardLayoutWrapperProps) {
+export function DashboardLayoutWrapper({ children, email, initial, fullName, companyName, role }: DashboardLayoutWrapperProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   return (
@@ -33,7 +34,7 @@ export function DashboardLayoutWrapper({ children, email, initial, fullName, com
         ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
       `}>
          <div className="h-full relative">
-            <DashboardSidebar />
+            <DashboardSidebar role={role} />
             <button 
                 onClick={() => setSidebarOpen(false)}
                 className="absolute top-4 right-4 md:hidden text-white/70 hover:text-white"
@@ -68,7 +69,7 @@ export function DashboardLayoutWrapper({ children, email, initial, fullName, com
                 email={email} 
                 initial={initial} 
                 fullName={fullName}
-                role="Cliente"
+                role={role === 'superadmin' ? 'Superadmin' : role === 'comercial' ? 'Comercial' : role === 'cartera' ? 'Cartera' : 'Cliente'}
                 basePath="/dashboard"
               />
             </div>

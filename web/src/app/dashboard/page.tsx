@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { getUserProfile } from '@/lib/supabase/profile'
 import { Wallet, ShieldCheck, AlertCircle, TrendingUp, Download, Filter, FileText } from 'lucide-react'
 import Link from 'next/link'
 import { KpiCard } from '@/components/dashboard/KpiCard'
@@ -8,26 +9,20 @@ import { ExportButton } from '@/components/ui/ExportButton'
 
 export default async function DashboardPage() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const profile = await getUserProfile(supabase)
 
-  if (!user) return <div className="p-8">Cargando sesión...</div>
-
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('total_bag')
-    .eq('id', user.id)
-    .single()
+  if (!profile) return <div className="p-8">Cargando sesión...</div>
 
   const { data: invoices } = await supabase
     .from('invoices')
     .select('*')
-    .eq('client_id', user.id)
+    .eq('company_id', profile.company_id)
     .order('created_at', { ascending: false })
 
   const { data: payers } = await supabase
     .from('payers')
     .select('approved_quota')
-    .eq('created_by', user.id)
+    .eq('company_id', profile.company_id)
     .eq('risk_status', 'aprobado')
 
   const allInvoices = invoices || []

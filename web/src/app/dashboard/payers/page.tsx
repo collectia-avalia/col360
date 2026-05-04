@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { getUserProfile } from '@/lib/supabase/profile'
 import Link from 'next/link'
 import { Plus } from 'lucide-react'
 import { PayersList } from './PayersList'
@@ -8,13 +9,12 @@ export const dynamic = 'force-dynamic'
 
 export default async function PayersPage() {
   const supabase = await createClient()
-  
-  const { data: { user } } = await supabase.auth.getUser()
+  const profile = await getUserProfile(supabase)
 
   const { data: payers } = await supabase
     .from('payers')
     .select('*, invoices(*), payer_documents(id)')
-    .eq('created_by', user?.id)
+    .eq('company_id', profile?.company_id)
     .order('created_at', { ascending: false })
 
   return (
@@ -24,10 +24,12 @@ export default async function PayersPage() {
           <h1 className="text-2xl font-bold text-gray-900">Clientes</h1>
           <p className="text-sm text-gray-500 mt-1">Gestiona los clientes a los que deseas asignar cupo.</p>
         </div>
-        <InvitePayerModal />
+        {(profile?.role === 'superadmin' || profile?.role === 'comercial') && (
+          <InvitePayerModal />
+        )}
       </div>
 
-      <PayersList payers={payers || []} />
+      <PayersList payers={payers || []} role={profile?.role} />
     </div>
   )
 }

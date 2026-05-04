@@ -7,15 +7,23 @@ import { usePathname } from 'next/navigation'
 import { AvaliaLogo } from '@/components/ui/Logo'
 import { cn } from '@/lib/utils'
 
-export function DashboardSidebar() {
+interface SidebarProps {
+  role?: string
+}
+
+export function DashboardSidebar({ role }: SidebarProps) {
   const pathname = usePathname()
 
-  const links = [
-    { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { href: '/dashboard/payers', label: 'Clientes', icon: UserSearch },
-    { href: '/dashboard/invoices', label: 'Facturas', icon: UploadCloud },
-    { href: '/dashboard/profile', label: 'Configuración', icon: Settings },
+  const allLinks = [
+    { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['superadmin', 'comercial', 'cartera', 'client'] },
+    { href: '/dashboard/payers', label: 'Clientes', icon: UserSearch, roles: ['superadmin', 'comercial'] },
+    { href: '/dashboard/invoices', label: 'Facturas', icon: UploadCloud, roles: ['superadmin', 'cartera'] },
+    { href: '/dashboard/profile', label: 'Configuración', icon: Settings, roles: ['superadmin', 'comercial', 'cartera', 'client'] },
+    // Nueva sección para gestión de usuarios solo para superadmin
+    { href: '/dashboard/settings/users', label: 'Equipo', icon: Settings, roles: ['superadmin'] },
   ]
+
+  const links = allLinks.filter(link => !link.roles || (role && link.roles.includes(role)))
 
   return (
       <aside className="h-full w-full bg-avalia-petrol text-white flex flex-col shadow-xl z-20 overflow-y-auto">

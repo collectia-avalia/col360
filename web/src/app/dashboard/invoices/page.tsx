@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { getUserProfile } from '@/lib/supabase/profile'
 import Link from 'next/link'
 import { Plus, CheckCircle, AlertTriangle } from 'lucide-react'
 import { InvoicesList } from './InvoicesList'
@@ -10,12 +11,12 @@ export default async function InvoicesPage({
 }) {
   const params = await searchParams
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const profile = await getUserProfile(supabase)
 
   const { data: invoices } = await supabase
     .from('invoices')
     .select('*, payers(razon_social)')
-    .eq('client_id', user?.id)
+    .eq('company_id', profile?.company_id)
     .order('created_at', { ascending: false })
 
   const filterStatusParam = typeof params['status'] === 'string' ? params['status'] : undefined
@@ -56,16 +57,18 @@ export default async function InvoicesPage({
           <h1 className="text-2xl font-bold text-gray-900">Mis Facturas</h1>
           <p className="text-sm text-gray-500 mt-1">Gestiona las facturas radicadas en el sistema.</p>
         </div>
-        <Link
-          href="/dashboard/invoices/new"
-          className="mt-4 sm:mt-0 inline-flex items-center px-4 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-[#7c3aed] hover:bg-[#6d28d9] transition-colors"
-        >
-          <Plus className="-ml-1 mr-2 h-5 w-5" />
-          Radicar Nueva Factura
-        </Link>
+        {(profile?.role === 'superadmin' || profile?.role === 'cartera') && (
+          <Link
+            href="/dashboard/invoices/new"
+            className="mt-4 sm:mt-0 inline-flex items-center px-4 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-[#7c3aed] hover:bg-[#6d28d9] transition-colors"
+          >
+            <Plus className="-ml-1 mr-2 h-5 w-5" />
+            Radicar Nueva Factura
+          </Link>
+        )}
       </div>
 
-      <InvoicesList invoices={invoices || []} initialFilterStatus={initialFilterStatus} />
+      <InvoicesList invoices={invoices || []} initialFilterStatus={initialFilterStatus} role={profile?.role} />
     </div>
   )
 }

@@ -30,7 +30,8 @@ export async function ensureUserProfile(supabase: SupabaseClient, userId: string
                 company_name: user.user_metadata?.company_name || 'Empresa sin nombre',
                 role: (user.user_metadata?.role as any) || 'client',
                 nit: user.user_metadata?.nit || null,
-                total_bag: Number(user.user_metadata?.total_bag) || 0
+                total_bag: Number(user.user_metadata?.total_bag) || 0,
+                company_id: user.user_metadata?.company_id || null
             })
 
         if (insertProfileError) {
@@ -43,3 +44,29 @@ export async function ensureUserProfile(supabase: SupabaseClient, userId: string
 
     return { success: true }
 }
+
+export async function getUserProfile(supabase: SupabaseClient) {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return null
+
+    const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('*, companies(*)')
+        .eq('id', user.id)
+        .single()
+
+    if (error || !profile) {
+        console.error('[PERFIL] Error obteniendo perfil:', error)
+        // Intentar reparación si no existe
+        const repair = await ensureUserProfile(supabase, user.id)
+        if (repair.success) {
+            // Re-intento recursivo (con precaución)
+            const { data: rep } = await supabase.from('profiles').select('*, companies(*)').eq('id', user.id).single()
+            return rep
+        }
+        return null
+    }
+
+    return profile
+}
+

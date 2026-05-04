@@ -19,7 +19,7 @@ interface Invoice {
   }
 }
 
-export function InvoicesList({ invoices, initialFilterStatus }: { invoices: Invoice[], initialFilterStatus: string }) {
+export function InvoicesList({ invoices, initialFilterStatus, role }: { invoices: Invoice[], initialFilterStatus: string, role?: string }) {
   const [filterStatus, setFilterStatus] = useState(initialFilterStatus || 'todos')
   const [filterGuarantee, setFilterGuarantee] = useState('todos')
   const [searchTerm, setSearchTerm] = useState('')
@@ -340,13 +340,15 @@ export function InvoicesList({ invoices, initialFilterStatus }: { invoices: Invo
                     <Link href={`/dashboard/invoices/${invoice.id}`} className="text-[#7c3aed] hover:text-[#6d28d9]">
                         Ver Detalle
                     </Link>
-                    <button 
-                        onClick={() => handleStatusChange(invoice.id, invoice.status)}
-                        disabled={updatingId === invoice.id}
-                        className="text-gray-500 hover:text-gray-900 disabled:opacity-50"
-                    >
-                        {updatingId === invoice.id ? '...' : (invoice.status === 'pagada' ? 'Reabrir' : 'Marcar Pagada')}
-                    </button>
+                    {(role === 'superadmin' || role === 'cartera') && (
+                      <button 
+                          onClick={() => handleStatusChange(invoice.id, invoice.status)}
+                          disabled={updatingId === invoice.id}
+                          className="text-gray-500 hover:text-gray-900 disabled:opacity-50"
+                      >
+                          {updatingId === invoice.id ? '...' : (invoice.status === 'pagada' ? 'Reabrir' : 'Marcar Pagada')}
+                      </button>
+                    )}
                   </div>
                 </td>
               </tr>

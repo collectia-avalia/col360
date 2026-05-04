@@ -22,7 +22,7 @@ interface Payer {
   signed_at?: string
 }
 
-export function PayersList({ payers }: { payers: Payer[] }) {
+export function PayersList({ payers, role }: { payers: Payer[], role?: string }) {
   const router = useRouter()
   const [filter, setFilter] = useState('todos')
   const [searchTerm, setSearchTerm] = useState('')
@@ -375,9 +375,28 @@ export function PayersList({ payers }: { payers: Payer[] }) {
                         className="inline-flex items-center px-3 py-1.5 text-xs font-medium text-indigo-700 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-indigo-500" 
                         title="Ver Detalles"
                     >
-                        <FileText className="w-3.5 h-3.5 mr-1.5" />
                         Ver Detalle
                     </Link>
+
+                    {(role === 'superadmin' || role === 'comercial') && (
+                      <button 
+                        onClick={() => handleEditClick(payer)}
+                        className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                        title="Editar"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </button>
+                    )}
+
+                    {role === 'superadmin' && (
+                      <button 
+                        onClick={() => handleDeleteClick(payer)}
+                        className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        title="Eliminar"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
                   </div>
                 </td>
               </tr>

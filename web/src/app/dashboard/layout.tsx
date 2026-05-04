@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { getUserProfile } from '@/lib/supabase/profile'
 import { DashboardLayoutWrapper } from '@/components/layouts/DashboardLayoutWrapper'
 
 export default async function DashboardLayout({
@@ -7,23 +8,13 @@ export default async function DashboardLayout({
   children: React.ReactNode
 }) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const profile = await getUserProfile(supabase)
   
-  // Obtener datos del perfil o metadata
-  let companyName = 'Empresa'
-  const email = user?.email || ''
-  let fullName = ''
-  
-  if (user) {
-     const { data: profile } = await supabase
-        .from('profiles')
-        .select('company_name, full_name')
-        .eq('id', user.id)
-        .single()
-     
-     companyName = profile?.company_name || user.user_metadata?.company_name || 'Empresa'
-     fullName = profile?.full_name || companyName
-  }
+  // Obtener datos del perfil
+  const companyName = profile?.companies?.name || profile?.company_name || 'Empresa'
+  const email = profile?.email || ''
+  const fullName = profile?.full_name || companyName
+  const role = profile?.role || 'client'
 
   const initials = companyName.substring(0, 2).toUpperCase()
 
@@ -33,6 +24,7 @@ export default async function DashboardLayout({
       initial={initials}
       fullName={fullName}
       companyName={companyName}
+      role={role}
     >
       {children}
     </DashboardLayoutWrapper>

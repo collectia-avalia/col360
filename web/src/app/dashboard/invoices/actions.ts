@@ -3,7 +3,7 @@
 import React from 'react'
 
 import { createClient } from '@/lib/supabase/server'
-import { ensureUserProfile } from '@/lib/supabase/profile'
+import { ensureUserProfile, getUserProfile } from '@/lib/supabase/profile'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { z } from 'zod'
@@ -24,7 +24,15 @@ export async function createInvoiceAction(formData: FormData) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  if (!user) return { error: 'No autorizado' }
+  if (!user) return { error: 'No autenticado' }
+
+  const profile = await getUserProfile(supabase)
+  if (!profile) return { error: 'No autorizado' }
+
+  // Validar Rol
+  if (profile.role !== 'superadmin' && profile.role !== 'cartera') {
+    return { error: 'No tienes permisos para cargar facturas (Requiere rol Superadmin o Cartera)' }
+  }
 
   // 1. Validar Datos
   const rawData = {
@@ -103,7 +111,7 @@ export async function createInvoiceAction(formData: FormData) {
 
   if (file && file.size > 0) {
     const fileExt = file.name.split('.').pop()
-    const filePath = `${user.id}/${payerId}/${invoiceNumber}_${Date.now()}.${fileExt}`
+    const filePath = `${profile.company_id}/${payerId}/${invoiceNumber}_${Date.now()}.${fileExt}`
 
     const { error: uploadError } = await supabase.storage
       .from('invoices-docs')
@@ -133,7 +141,8 @@ export async function createInvoiceAction(formData: FormData) {
     .insert({
       invoice_number: invoiceNumber,
       payer_id: payerId,
-      client_id: user.id,
+      client_id: profile.id,
+      company_id: profile.company_id,
       amount: numericAmount,
       issue_date: issueDate,
       due_date: dueDate,
@@ -167,15 +176,18 @@ export async function createInvoiceAction(formData: FormData) {
 
 export async function toggleInvoiceStatus(invoiceId: string, newStatus: string) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const profile = await getUserProfile(supabase)
+  if (!profile) return { error: 'No autorizado' }
 
-  if (!user) return { error: 'No autorizado' }
+  if (profile.role !== 'superadmin' && profile.role !== 'cartera') {
+    return { error: 'No tienes permisos para cambiar el estado de facturas' }
+  }
 
   const { error } = await supabase
     .from('invoices')
     .update({ status: newStatus })
     .eq('id', invoiceId)
-    .eq('client_id', user.id)
+    .eq('company_id', profile.company_id)
 
   if (error) {
     return { error: 'Error actualizando estado' }
@@ -188,7 +200,15 @@ export async function toggleInvoiceStatus(invoiceId: string, newStatus: string) 
 export async function sendInvoiceEmailAction(invoiceId: string, email: string, subject: string, body: string) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'No autorizado' }
+
+  if (!user) return { error: 'No autenticado' }
+
+  const profile = await getUserProfile(supabase)
+  if (!profile) return { error: 'No autorizado' }
+
+  if (profile.role !== 'superadmin' && profile.role !== 'cartera') {
+    return { error: 'No tienes permisos para enviar correos de facturas' }
+  }
 
   // Consultar detalles de la factura para la plantilla
   const { data: invoice } = await supabase
