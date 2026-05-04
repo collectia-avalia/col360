@@ -92,12 +92,6 @@ export async function updateSession(request: NextRequest) {
     }
 
     if (request.nextUrl.pathname.startsWith('/dashboard')) {
-      if (role === 'admin') {
-        console.log(`[Middleware] Redirigiendo Admin Global de /dashboard a /admin`)
-        const url = request.nextUrl.clone()
-        url.pathname = '/admin'
-        return NextResponse.redirect(url)
-      }
       if (role === 'payer_guest') {
         console.log(`[Middleware] Redirigiendo Pagador de /dashboard a /portal`)
         const url = request.nextUrl.clone()

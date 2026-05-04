@@ -45,12 +45,12 @@ export default async function EditClientPage({ params }: { params: Promise<{ id:
   const { data: payers } = await supabase
     .from('payers')
     .select('risk_status, approved_quota')
-    .eq('created_by', id)
+    .eq(client.company_id ? 'company_id' : 'created_by', client.company_id || id)
 
   const { data: invoicesRaw } = await supabase
     .from('invoices')
     .select('id, invoice_number, amount, issue_date, due_date, status, is_guaranteed, file_url, payer_id')
-    .eq('client_id', id)
+    .eq(client.company_id ? 'company_id' : 'client_id', client.company_id || id)
     .order('issue_date', { ascending: false })
 
   const invoices = invoicesRaw || []
