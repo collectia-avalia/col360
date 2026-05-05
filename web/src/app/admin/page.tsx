@@ -70,7 +70,8 @@ export default async function AdminDashboard({
       created_at, 
       risk_status,
       companies (
-        name
+        name,
+        credit_study_fee
       )
     `),
     supabase.from('invoices').select('amount, created_at, is_guaranteed, status, due_date'),
