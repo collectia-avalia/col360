@@ -12,6 +12,7 @@ interface ClientData {
   email: string | null
   total_bag?: number | null
   max_exposure?: number | null
+  credit_study_fee?: number | null
 }
 
 export default function EditClientForm({ client }: { client: ClientData }) {
@@ -106,6 +107,25 @@ export default function EditClientForm({ client }: { client: ClientData }) {
             </div>
             <p className="mt-1 text-xs text-gray-500">Tope máximo de cupo por cada pagador.</p>
           </div>
+        </div>
+
+        {/* Valor Estudio de Crédito */}
+        <div>
+          <label htmlFor="creditStudyFee" className="block text-sm font-medium text-gray-700">Valor Estudio de Crédito ($)</label>
+          <div className="mt-1">
+            <input
+              type="number"
+              name="creditStudyFee"
+              id="creditStudyFee"
+              defaultValue={client.credit_study_fee || 0}
+              min="0"
+              step="0.01"
+              className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md py-2 px-3 border font-bold text-green-600"
+              placeholder="Ej: 50000"
+              required
+            />
+          </div>
+          <p className="mt-1 text-xs text-gray-500">Valor que se le cobrará a la empresa por cada estudio de crédito realizado.</p>
         </div>
 
       </div>

@@ -70,7 +70,8 @@ export default async function AdminDashboard({
       created_at, 
       risk_status,
       companies (
-        name
+        name,
+        credit_study_fee
       )
     `),
     supabase.from('invoices').select('amount, created_at, is_guaranteed, status, due_date'),
@@ -147,19 +148,23 @@ export default async function AdminDashboard({
   })
 
   // 4. Procesar Reporte de Estudios de Crédito por Empresa
-  const creditStudyMap = new Map<string, { total: number; approved: number; rejected: number; pending: number }>()
+  const creditStudyMap = new Map<string, { total: number; approved: number; rejected: number; pending: number; fee: number }>()
 
   payersList.forEach((p: any) => {
     const month = new Date(p.created_at).toISOString().slice(0, 7)
     const companyName = p.companies?.name || 'Empresa No Asignada'
+    const fee = Number(p.companies?.credit_study_fee || 0)
     const key = `${month}|${companyName}`
     
-    const current = creditStudyMap.get(key) || { total: 0, approved: 0, rejected: 0, pending: 0 }
+    const current = creditStudyMap.get(key) || { total: 0, approved: 0, rejected: 0, pending: 0, fee: fee }
     
     current.total++
     if (p.risk_status === 'aprobado') current.approved++
     else if (p.risk_status === 'rechazado') current.rejected++
     else current.pending++
+    
+    // Asegurar que usamos el fee más reciente o el disponible
+    if (fee > 0) current.fee = fee
     
     creditStudyMap.set(key, current)
   })

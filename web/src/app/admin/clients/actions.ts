@@ -15,6 +15,7 @@ const createClientSchema = z.object({
   password: z.string().min(6, 'La contraseña debe tener al menos 6 caracteres'),
   totalBag: z.coerce.number().min(0, 'El valor de la bolsa debe ser positivo'),
   maxExposure: z.coerce.number().min(0).max(100).default(100),
+  creditStudyFee: z.coerce.number().min(0, 'El valor del estudio debe ser positivo').default(0),
 })
 
 export async function createClientAction(formData: FormData) {
@@ -27,6 +28,7 @@ export async function createClientAction(formData: FormData) {
     password: formData.get('password'),
     totalBag: formData.get('totalBag'),
     maxExposure: formData.get('maxExposure'),
+    creditStudyFee: formData.get('creditStudyFee'),
   }
 
   const validation = createClientSchema.safeParse(rawData)
@@ -35,12 +37,16 @@ export async function createClientAction(formData: FormData) {
     return { error: validation.error.flatten().fieldErrors }
   }
 
-  const { email, password, companyName, nit, totalBag, maxExposure } = validation.data
+  const { email, password, companyName, nit, totalBag, maxExposure, creditStudyFee } = validation.data
 
   // 0. Crear Empresa
   const { data: company, error: companyError } = await adminSupabase
     .from('companies')
-    .insert({ name: companyName, nit: nit })
+    .insert({ 
+      name: companyName, 
+      nit: nit,
+      credit_study_fee: creditStudyFee 
+    })
     .select()
     .single()
 
@@ -58,6 +64,7 @@ export async function createClientAction(formData: FormData) {
       nit: nit,
       total_bag: totalBag,
       max_exposure: maxExposure,
+      credit_study_fee: creditStudyFee,
       role: 'superadmin', // El primer usuario es siempre superadmin
       company_id: company.id
     }
@@ -91,6 +98,7 @@ export async function createClientAction(formData: FormData) {
         nit: nit,
         total_bag: totalBag,
         max_exposure: maxExposure,
+        credit_study_fee: creditStudyFee,
         company_id: company.id
       })
 
@@ -106,7 +114,8 @@ export async function createClientAction(formData: FormData) {
       .update({
         nit: nit,
         total_bag: totalBag,
-        max_exposure: maxExposure
+        max_exposure: maxExposure,
+        credit_study_fee: creditStudyFee
       })
       .eq('id', user.user.id)
   }

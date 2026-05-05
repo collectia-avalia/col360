@@ -35,6 +35,7 @@ export default function NewClientPage() {
     password?: string[]
     totalBag?: string[]
     maxExposure?: string[]
+    creditStudyFee?: string[]
     root?: string[]
   } | null>(null)
 
@@ -159,6 +160,33 @@ export default function NewClientPage() {
               <p className="mt-1 text-xs text-gray-500">Porcentaje máximo de la bolsa que se puede asignar a un solo pagador.</p>
               {serverError?.maxExposure && (
                 <p className="mt-1 text-sm text-red-600">{serverError.maxExposure[0]}</p>
+              )}
+            </div>
+
+            {/* Valor Estudio de Crédito */}
+            <div>
+              <label htmlFor="creditStudyFee" className="block text-sm font-medium text-gray-700">
+                Valor Estudio de Crédito ($)
+              </label>
+              <div className="mt-1 relative rounded-md shadow-sm">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Wallet className="h-5 w-5 text-gray-400" aria-hidden="true" />
+                </div>
+                <input
+                  type="number"
+                  name="creditStudyFee"
+                  id="creditStudyFee"
+                  required
+                  min="0"
+                  step="0.01"
+                  defaultValue="0"
+                  className="focus:ring-indigo-500 focus:border-indigo-500 block w-full pl-10 sm:text-sm border-gray-300 rounded-md py-2 border font-bold text-green-600"
+                  placeholder="Ej: 50000"
+                />
+              </div>
+              <p className="mt-1 text-xs text-gray-500">Valor que se le cobrará a la empresa por cada estudio de crédito realizado.</p>
+              {serverError?.creditStudyFee && (
+                <p className="mt-1 text-sm text-red-600">{serverError.creditStudyFee[0]}</p>
               )}
             </div>
 

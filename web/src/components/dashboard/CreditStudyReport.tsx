@@ -9,6 +9,7 @@ interface MonthlyCompanyData {
   approved: number
   rejected: number
   pending: number
+  fee: number
 }
 
 interface CreditStudyReportProps {
@@ -36,11 +37,14 @@ export function CreditStudyReport({ data }: CreditStudyReportProps) {
     return date.toLocaleString('es-CO', { month: 'long', year: 'numeric' })
   }
 
+  const formatCurrency = (val: number) =>
+    new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(val)
+
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
       <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/50">
-        <h3 className="text-lg font-semibold text-gray-900">Reporte de Estudios de Crédito</h3>
-        <p className="text-sm text-gray-500">Desglose mensual por empresa y estado de aprobación.</p>
+        <h3 className="text-lg font-semibold text-gray-900">Reporte de Facturación por Estudios</h3>
+        <p className="text-sm text-gray-500">Desglose mensual de estudios realizados y valor total a cobrar.</p>
       </div>
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200">
@@ -61,8 +65,11 @@ export function CreditStudyReport({ data }: CreditStudyReportProps) {
               <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Rechazados
               </th>
-              <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Pendientes
+              <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Valor Unitario
+              </th>
+              <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Total a Cobrar
               </th>
             </tr>
           </thead>
@@ -88,10 +95,11 @@ export function CreditStudyReport({ data }: CreditStudyReportProps) {
                     {row.rejected}
                   </span>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-center">
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                    {row.pending}
-                  </span>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-gray-500">
+                  {formatCurrency(row.fee)}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-black text-indigo-600">
+                  {formatCurrency(row.total * row.fee)}
                 </td>
               </tr>
             ))}

@@ -42,9 +42,17 @@ export async function updateClientAction(userId: string, formData: FormData) {
     const email = formData.get('email') as string
     const totalBag = Number(formData.get('totalBag'))
     const maxExposure = Number(formData.get('maxExposure'))
+    const creditStudyFee = Number(formData.get('creditStudyFee'))
 
     try {
-        // 1. Actualizar Auth (Email) si cambió
+        // 1. Obtener company_id del perfil
+        const { data: currentProfile } = await supabase
+            .from('profiles')
+            .select('company_id')
+            .eq('id', userId)
+            .single()
+
+        // 2. Actualizar Auth (Email) si cambió
         if (email) {
             const { error: authError } = await supabase.auth.admin.updateUserById(userId, {
                 email: email,
@@ -53,18 +61,32 @@ export async function updateClientAction(userId: string, formData: FormData) {
             if (authError) throw new Error('Error actualizando email: ' + authError.message)
         }
 
-        // 2. Actualizar Profile
+        // 3. Actualizar Profile
         const { error: profileError } = await supabase
             .from('profiles')
             .update({
                 company_name: companyName,
                 email: email,
                 total_bag: totalBag,
-                max_exposure: maxExposure
-            }) // Sincronizamos email y bolsa en profile
+                max_exposure: maxExposure,
+                credit_study_fee: creditStudyFee
+            })
             .eq('id', userId)
 
         if (profileError) throw new Error('Error actualizando perfil: ' + profileError.message)
+
+        // 4. Actualizar Empresa (si existe vinculación)
+        if (currentProfile?.company_id) {
+            const { error: companyError } = await supabase
+                .from('companies')
+                .update({
+                    name: companyName,
+                    credit_study_fee: creditStudyFee
+                })
+                .eq('id', currentProfile.company_id)
+            
+            if (companyError) console.error('Error sincronizando con tabla companies:', companyError)
+        }
 
         revalidatePath('/admin/clients')
         revalidatePath(`/admin/clients/${userId}`)
