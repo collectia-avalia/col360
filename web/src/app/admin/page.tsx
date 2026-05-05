@@ -2,6 +2,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { Users, FileCheck, Clock, TrendingUp, Building2, CreditCard } from 'lucide-react'
 import { KpiCard } from '@/components/dashboard/KpiCard'
 import { InvoiceChart } from '@/components/dashboard/InvoiceChart'
+import { CreditStudyReport } from '@/components/dashboard/CreditStudyReport'
 import Link from 'next/link'
 import { AdminSystemStatus } from './system-status'
 
@@ -64,7 +65,14 @@ export default async function AdminDashboard({
   ] = await Promise.all([
     supabase.from('profiles').select('id, company_name, total_bag, created_at').eq('role', 'superadmin'),
     supabase.from('payers').select('*', { count: 'exact', head: true }).eq('risk_status', 'pendiente'),
-    supabase.from('payers').select('approved_quota, created_at, risk_status'),
+    supabase.from('payers').select(`
+      approved_quota, 
+      created_at, 
+      risk_status,
+      companies (
+        name
+      )
+    `),
     supabase.from('invoices').select('amount, created_at, is_guaranteed, status, due_date'),
   ])
 
@@ -135,6 +143,33 @@ export default async function AdminDashboard({
       name: `${monthLabel} ${y}`,
       bag: runningBag,
       quota: runningQuota
+    }
+  })
+
+  // 4. Procesar Reporte de Estudios de Crédito por Empresa
+  const creditStudyMap = new Map<string, { total: number; approved: number; rejected: number; pending: number }>()
+
+  payersList.forEach((p: any) => {
+    const month = new Date(p.created_at).toISOString().slice(0, 7)
+    const companyName = p.companies?.name || 'Empresa No Asignada'
+    const key = `${month}|${companyName}`
+    
+    const current = creditStudyMap.get(key) || { total: 0, approved: 0, rejected: 0, pending: 0 }
+    
+    current.total++
+    if (p.risk_status === 'aprobado') current.approved++
+    else if (p.risk_status === 'rechazado') current.rejected++
+    else current.pending++
+    
+    creditStudyMap.set(key, current)
+  })
+
+  const creditStudyReportData = Array.from(creditStudyMap.entries()).map(([key, stats]) => {
+    const [month, companyName] = key.split('|')
+    return {
+      month,
+      companyName,
+      ...stats
     }
   })
 
@@ -265,6 +300,11 @@ export default async function AdminDashboard({
               totalInvoicesCount={invoicesList.length}
             />
         </div>
+      </div>
+
+      {/* Reporte de Estudios de Crédito */}
+      <div className="mt-8">
+        <CreditStudyReport data={creditStudyReportData} />
       </div>
     </div>
   )
