@@ -27,22 +27,14 @@ export default async function ApprovalDetailPage({ params }: { params: Promise<{
   }
 
   // 2. Obtener Documentos
+  // Las URLs se generan en el momento del clic via /api/docs/sign para evitar
+  // que expiren si la página lleva abierta más de 1 hora.
   const { data: documents } = await supabase
     .from('payer_documents')
     .select('*')
     .eq('payer_id', payerId)
 
-  // 3. Generar URLs firmadas para los documentos
-  const docsWithUrls = await Promise.all((documents || []).map(async (doc) => {
-    const { data } = await supabase.storage
-      .from('legal-docs')
-      .createSignedUrl(doc.file_path, 3600) // 1 hora de validez
-    
-    return {
-      ...doc,
-      signedUrl: data?.signedUrl
-    }
-  }))
+  const docsWithUrls = (documents || [])
 
   return (
     <div className="max-w-4xl mx-auto pb-12">
@@ -164,12 +156,17 @@ export default async function ApprovalDetailPage({ params }: { params: Promise<{
                                 </div>
                             </div>
                             <div className="ml-5 flex-shrink-0">
-                                {doc.signedUrl ? (
-                                    <a href={doc.signedUrl} target="_blank" rel="noreferrer" className="inline-flex items-center px-3 py-1.5 text-xs font-bold text-indigo-700 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors">
-                                        <Download className="h-3.5 w-3.5 mr-1.5" /> Ver DocumentO
+                                {doc.file_path ? (
+                                    <a
+                                      href={`/api/docs/sign?path=${encodeURIComponent(doc.file_path)}&bucket=legal-docs`}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="inline-flex items-center px-3 py-1.5 text-xs font-bold text-indigo-700 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors"
+                                    >
+                                        <Download className="h-3.5 w-3.5 mr-1.5" /> Ver Documento
                                     </a>
                                 ) : (
-                                    <span className="text-gray-400 text-sm italic">Ocurrió un error al generar link</span>
+                                    <span className="text-gray-400 text-sm italic">Documento no disponible</span>
                                 )}
                             </div>
                         </li>
