@@ -22,7 +22,7 @@ export default async function ApprovalDetailPage({
 
   // Obtener usuario actual para permisos de edición
   const { data: { user } } = await supabase.auth.getUser()
-  const canEdit = user?.email === 'operaciones@collectisbpo.com'
+  const canEdit = user?.email === 'operaciones@collectiabpo.com'
 
   // 1. Obtener Datos del Pagador
   const { data: payer } = await supabaseAdmin
