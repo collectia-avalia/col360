@@ -4,7 +4,7 @@ import { approvePayerAction, rejectPayerAction } from '@/lib/actions/admin'
 import { useState, useTransition } from 'react'
 import { Loader2, CheckCircle, XCircle } from 'lucide-react'
 
-export default function DecisionForm({ payerId }: { payerId: string }) {
+export default function DecisionForm({ payerId, initialReason }: { payerId: string, initialReason?: string }) {
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
 
@@ -93,6 +93,7 @@ export default function DecisionForm({ payerId }: { payerId: string }) {
                   rows={2}
                   className="shadow-sm focus:ring-red-500 focus:border-red-500 block w-full sm:text-sm border-gray-300 rounded-md"
                   placeholder="Explica por qué se rechaza..."
+                  defaultValue={initialReason}
                 />
               </div>
               <div className="mt-4">

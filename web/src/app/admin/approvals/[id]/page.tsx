@@ -1,16 +1,31 @@
 import { createAdminClient } from '@/lib/supabase/admin'
+import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
-import { ArrowLeft, FileText, Download, ShieldCheck, Award } from 'lucide-react'
+import { ArrowLeft, FileText, Download, ShieldCheck, Award, Pencil } from 'lucide-react'
 import DecisionForm from './decision-form'
 import { DigitalCertificate } from '@/components/DigitalCertificate'
 
-export default async function ApprovalDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function ApprovalDetailPage({ 
+  params, 
+  searchParams 
+}: { 
+  params: Promise<{ id: string }>,
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>
+}) {
   const { id } = await params
-  const supabase = createAdminClient()
+  const sParams = await searchParams
+  const isEditing = sParams['edit'] === 'true'
+  
+  const supabaseAdmin = createAdminClient()
+  const supabase = await createClient()
   const payerId = id
 
+  // Obtener usuario actual para permisos de edición
+  const { data: { user } } = await supabase.auth.getUser()
+  const canEdit = user?.email === 'operaciones@collectisbpo.com'
+
   // 1. Obtener Datos del Pagador
-  const { data: payer } = await supabase
+  const { data: payer } = await supabaseAdmin
     .from('payers')
     .select(`
       *,
@@ -27,9 +42,7 @@ export default async function ApprovalDetailPage({ params }: { params: Promise<{
   }
 
   // 2. Obtener Documentos
-  // Las URLs se generan en el momento del clic via /api/docs/sign para evitar
-  // que expiren si la página lleva abierta más de 1 hora.
-  const { data: documents } = await supabase
+  const { data: documents } = await supabaseAdmin
     .from('payer_documents')
     .select('*')
     .eq('payer_id', payerId)
@@ -46,14 +59,29 @@ export default async function ApprovalDetailPage({ params }: { params: Promise<{
           <ArrowLeft className="mr-1 h-4 w-4" />
           Volver al tablero
         </Link>
-        <h1 className="text-2xl font-bold text-gray-900">Análisis de Solicitud</h1>
-        <div className="flex items-center mt-2 space-x-4">
-            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
-                ${payer.risk_status === 'pendiente' ? 'bg-yellow-100 text-yellow-800' : 
-                  payer.risk_status === 'aprobado' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                {payer.risk_status.toUpperCase()}
-            </span>
-            <span className="text-sm text-gray-500">Solicitado el {new Date(payer.created_at).toLocaleDateString()}</span>
+        <div className="flex justify-between items-start">
+            <div>
+                <h1 className="text-2xl font-bold text-gray-900">Análisis de Solicitud</h1>
+                <div className="flex items-center mt-2 space-x-4">
+                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                        ${payer.risk_status === 'pendiente' ? 'bg-yellow-100 text-yellow-800' : 
+                        payer.risk_status === 'aprobado' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                        {payer.risk_status.toUpperCase()}
+                    </span>
+                    <span className="text-sm text-gray-500">Solicitado el {new Date(payer.created_at).toLocaleDateString()}</span>
+                </div>
+            </div>
+            
+            {/* Botón Editar Dictamen (Solo para el admin especificado) */}
+            {canEdit && payer.risk_status !== 'pendiente' && !isEditing && (
+                <Link
+                  href={`/admin/approvals/${payerId}?edit=true`}
+                  className="inline-flex items-center px-4 py-2 border border-slate-200 rounded-lg text-sm font-bold text-slate-600 bg-white hover:bg-slate-50 transition-colors shadow-sm"
+                >
+                    <Pencil className="w-4 h-4 mr-2 text-indigo-500" />
+                    Editar Dictamen
+                </Link>
+            )}
         </div>
       </div>
 
@@ -208,9 +236,9 @@ export default async function ApprovalDetailPage({ params }: { params: Promise<{
                 </div>
             </div>
 
-            {/* Mostrar panel de decisión SOLO si está pendiente o en estudio */}
-            {(payer.risk_status === 'pendiente' || payer.risk_status === 'en estudio') ? (
-                <DecisionForm payerId={payerId} />
+            {/* Mostrar panel de decisión si está pendiente, en estudio, o si el admin quiere editar */}
+            {(payer.risk_status === 'pendiente' || payer.risk_status === 'en estudio' || isEditing) ? (
+                <DecisionForm payerId={payerId} initialReason={payer.rejection_reason} />
             ) : (
                 <div className="bg-white shadow sm:rounded-lg overflow-hidden">
                     <div className={`h-2 ${payer.risk_status === 'aprobado' ? 'bg-green-500' : 'bg-red-500'}`} />
@@ -233,11 +261,11 @@ export default async function ApprovalDetailPage({ params }: { params: Promise<{
                                     </p>
                                 </div>
                             )}
-                            {payer.risk_status === 'rechazado' && payer.rejection_reason && (
+                            {payer.risk_status === 'rechazado' && (
                                 <div className="mt-4 pt-4 border-t border-red-100">
                                     <p className="text-xs font-bold text-red-700 uppercase tracking-widest">Motivo de Rechazo</p>
                                     <p className="text-sm font-medium text-red-900 mt-1">
-                                        {payer.rejection_reason}
+                                        {payer.rejection_reason || 'No registrado'}
                                     </p>
                                 </div>
                             )}
