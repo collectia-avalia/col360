@@ -90,7 +90,8 @@ export async function processPayerAction(formData: FormData) {
       .from('payers')
       .update({
         risk_status: 'rechazado',
-        approved_quota: 0
+        approved_quota: 0,
+        rejection_reason: validation.data.reason
       })
       .eq('id', payerId)
 

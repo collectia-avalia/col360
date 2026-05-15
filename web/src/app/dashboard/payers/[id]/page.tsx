@@ -175,7 +175,7 @@ export default async function PayerDetailsPage({ params }: { params: Promise<{ i
                         <p className="text-xs opacity-80">
                             {payer.risk_status === 'pendiente' ? 'En proceso de análisis financiero.' : 
                              payer.risk_status === 'aprobado' ? 'Cupo disponible para uso inmediato.' : 
-                             'No cumple con las políticas de riesgo.'}
+                             payer.rejection_reason ? `Rechazado: ${payer.rejection_reason}` : 'No cumple con las políticas de riesgo.'}
                         </p>
                     </div>
                 </div>

@@ -134,7 +134,8 @@ export async function rejectPayerAction(payerId: string, reason: string) {
             .from('payers')
             .update({
                 risk_status: 'rechazado',
-                approved_quota: 0
+                approved_quota: 0,
+                rejection_reason: reason
             })
             .eq('id', payerId)
 

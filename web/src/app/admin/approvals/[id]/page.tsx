@@ -233,6 +233,14 @@ export default async function ApprovalDetailPage({ params }: { params: Promise<{
                                     </p>
                                 </div>
                             )}
+                            {payer.risk_status === 'rechazado' && payer.rejection_reason && (
+                                <div className="mt-4 pt-4 border-t border-red-100">
+                                    <p className="text-xs font-bold text-red-700 uppercase tracking-widest">Motivo de Rechazo</p>
+                                    <p className="text-sm font-medium text-red-900 mt-1">
+                                        {payer.rejection_reason}
+                                    </p>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
