@@ -3,10 +3,12 @@
 import { approvePayerAction, rejectPayerAction } from '@/lib/actions/admin'
 import { useState, useTransition } from 'react'
 import { Loader2, CheckCircle, XCircle } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 
 export default function DecisionForm({ payerId, initialReason }: { payerId: string, initialReason?: string }) {
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
+  const router = useRouter()
 
   const handleApprove = async (formData: FormData) => {
     setError(null)
@@ -19,7 +21,11 @@ export default function DecisionForm({ payerId, initialReason }: { payerId: stri
 
     startTransition(async () => {
       const result = await approvePayerAction(payerId, amount)
-      if (result?.error) setError(result.error)
+      if (result?.error) {
+        setError(result.error)
+      } else {
+        router.push(`/admin/approvals/${payerId}`)
+      }
     })
   }
 
@@ -29,7 +35,11 @@ export default function DecisionForm({ payerId, initialReason }: { payerId: stri
 
     startTransition(async () => {
       const result = await rejectPayerAction(payerId, reason)
-      if (result?.error) setError(result.error)
+      if (result?.error) {
+        setError(result.error)
+      } else {
+        router.push(`/admin/approvals/${payerId}`)
+      }
     })
   }
 
