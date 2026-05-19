@@ -5,6 +5,8 @@ import { login } from '../auth/actions'
 import { AvaliaLogo } from '@/components/ui/Logo'
 import { Copyright } from '@/components/ui/Copyright'
 import { SlideCaptcha } from '@/components/ui/SlideCaptcha'
+import Link from 'next/link'
+
 
 export default function LoginPage() {
   const [isCaptchaVerified, setIsCaptchaVerified] = useState(false)
@@ -87,9 +89,9 @@ export default function LoginPage() {
                 Recordarme
               </label>
             </div>
-            <a href="#" className="font-medium text-avalia-blue hover:text-avalia-violet">
+            <Link href="/forgot-password" className="font-medium text-avalia-blue hover:text-avalia-violet">
               ¿Olvidaste tu contraseña?
-            </a>
+            </Link>
           </div>
 
           <div className="py-2">
