@@ -76,42 +76,19 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=<ANON_KEY_DE_OUTPUT_START>
 ```
 *Las claves se muestran al finalizar `npx supabase start`.*
 
-## 5. Despliegue en Dokploy (Self-Hosted)
+## 5. Despliegue en Vercel (CI/CD Automático)
 
-Para desplegar la aplicación web (`/web`) en tu propia infraestructura usando Dokploy:
+El despliegue de la aplicación web (`/web`) se realiza de forma automática a través de **Vercel** conectado a la rama `main` del repositorio oficial de GitHub.
 
-### 1. Preparación del Proyecto
-El proyecto ya está configurado para Docker:
-- `web/Dockerfile`: Configuración multi-stage optimizada.
-- `web/.dockerignore`: Exclusión de archivos innecesarios.
-- `web/next.config.ts`: Configurado con `output: 'standalone'`.
-
-### 2. Configuración en Dokploy
-1.  Ingresa a tu panel de Dokploy.
-2.  Crea un nuevo **Project** (ej: `avalia-saas`).
-3.  Dentro del proyecto, crea una **Application**.
-4.  Conecta tu repositorio de GitHub/GitLab.
-
-### 3. Variables de Entorno (Environment)
-En la pestaña "Environment" de tu aplicación en Dokploy, agrega las siguientes variables de producción:
+### Variables de Entorno en Vercel
+En la configuración de tu proyecto en Vercel, asegúrate de configurar las siguientes variables de entorno de producción:
 
 ```env
-# URL de tu backend Supabase (Producción)
 NEXT_PUBLIC_SUPABASE_URL=https://tu-proyecto.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=tu-anon-key-publica
-
-# Claves de servicio (Solo si se usan en el servidor, no exponer al cliente)
 SUPABASE_SERVICE_ROLE_KEY=tu-service-role-key
+RESEND_API_KEY=tu-api-key-de-resend
 ```
 
-### 4. Configuración de Build (Build Settings)
-- **Build Type:** Dockerfile
-- **Context Path:** `/web` (Importante: el Dockerfile está dentro de la carpeta web)
-- **Dockerfile Path:** `/web/Dockerfile`
-
-### 5. Despliegue
-Haz clic en **Deploy**. Dokploy construirá la imagen usando el Dockerfile optimizado y levantará el contenedor en el puerto 3000 (expuesto automáticamente).
-
-### Notas Importantes
-- La imagen Docker usa `node:18-alpine` y una construcción multi-etapa para reducir el tamaño final (< 150MB aprox).
-- El modo `standalone` de Next.js copia solo los archivos necesarios para producción.
+### Proceso de Despliegue
+Cualquier cambio empujado a la rama `main` disparará automáticamente una construcción en Vercel.

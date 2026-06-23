@@ -4,5 +4,6 @@ git add package.json
 git commit -m "fix(deploy): move typescript to dependencies and set node engine"
 echo Subiendo cambios...
 git push origin main
-echo Listo. Dokploy deberia reconstruir automaticamente.
+echo Listo. Vercel deberia reconstruir automaticamente.
 pause
+

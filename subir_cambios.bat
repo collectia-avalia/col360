@@ -1,14 +1,11 @@
 @echo off
-echo Configurando repositorio remoto...
-git remote remove origin
-git remote add origin https://github.com/collectia-avalia/dokploy.git
-
 echo Guardando cambios...
 git add .
-git commit -m "Subida inicial a nuevo repositorio"
+git commit -m "Sube cambios a produccion"
 
-echo Subiendo al servidor...
-git push -u origin main --force
+echo Subiendo al servidor (Vercel)...
+git push origin main
 
 echo Proceso finalizado.
 pause
+
