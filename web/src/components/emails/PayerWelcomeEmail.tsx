@@ -169,8 +169,11 @@ export const PayerWelcomeEmail: React.FC<PayerWelcomeEmailProps> = ({
                 <p style={{ margin: '0 0 8px 0' }}>
                     © {new Date().getFullYear()} AvalIA B2B. Todos los derechos reservados.
                 </p>
+                <p style={{ margin: '0 0 8px 0', fontSize: '11px', color: '#94A3B8' }}>
+                    Si tienes dudas, contáctanos a <a href="mailto:comercial@avaliab2b.com" style={{ color: '#2563EB', textDecoration: 'none' }}>comercial@avaliab2b.com</a> o vía WhatsApp al <a href="https://wa.me/573015965775" style={{ color: '#2563EB', textDecoration: 'none' }}>+57 3015965775</a>.
+                </p>
                 <p style={{ margin: '0', fontSize: '11px', color: '#CBD5E1' }}>
-                    Este es un correo informativo sobre tu cupo de crédito comercial. No es necesario responder a este mensaje.
+                    Este es un correo informativo sobre tu cupo de crédito comercial.
                 </p>
             </div>
         </div>
