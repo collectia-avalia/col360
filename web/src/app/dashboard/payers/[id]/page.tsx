@@ -21,6 +21,12 @@ export default async function PayerDetailsPage({ params }: { params: Promise<{ i
     notFound()
   }
 
+  // Filtrar facturas anuladas para que el cliente no las vea
+  const visibleInvoices = (payer.invoices || []).filter((inv: any) => {
+    const decls = inv.legal_declarations as any
+    return !decls?.anulada
+  })
+
   // Estilos y etiquetas según estado
   const statusConfig = {
     pendiente: {
@@ -229,7 +235,7 @@ export default async function PayerDetailsPage({ params }: { params: Promise<{ i
       {/* Historial de Facturas */}
       <div className="space-y-4">
         <h2 className="text-lg font-semibold text-slate-900">Historial de Facturas</h2>
-        <InvoicesTable invoices={payer.invoices || []} payerId={payer.id} />
+        <InvoicesTable invoices={visibleInvoices} payerId={payer.id} />
       </div>
     </div>
   )

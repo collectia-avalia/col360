@@ -45,11 +45,16 @@ export default async function DashboardPage() {
 
   const profile = directProfile
 
-  const { data: invoices } = await supabase
+  const { data: rawInvoices } = await supabase
     .from('invoices')
     .select('*')
     .eq('company_id', profile.company_id)
     .order('created_at', { ascending: false })
+
+  const invoices = (rawInvoices || []).filter(inv => {
+    const decls = inv.legal_declarations as any
+    return !decls?.anulada
+  })
 
   const { data: payers } = await supabase
     .from('payers')

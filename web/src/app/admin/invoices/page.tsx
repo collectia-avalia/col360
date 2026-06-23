@@ -2,6 +2,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { FileText, DollarSign, ShieldCheck, TrendingUp, Download } from 'lucide-react'
 import { KpiCard } from '@/components/dashboard/KpiCard'
 import { InvoiceChart } from '@/components/dashboard/InvoiceChart'
+import { AdminInvoicesTable } from './AdminInvoicesTable'
 
 const formatCurrency = (val: number) =>
   new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(val)
@@ -11,9 +12,11 @@ const STATUS_STYLES: Record<string, string> = {
   vencida: 'bg-red-100 text-red-800',
   mora:    'bg-red-100 text-red-800',
   pagada:  'bg-gray-100 text-gray-600',
+  anulada: 'bg-orange-100 text-orange-800',
 }
 
-function getDisplayStatus(status: string, diasMora: number): string {
+function getDisplayStatus(status: string, diasMora: number, isAnulada?: boolean): string {
+  if (isAnulada) return 'anulada'
   if (diasMora > 0 && status !== 'pagada') return 'mora'
   return status
 }
@@ -24,7 +27,7 @@ export default async function AdminInvoicesPage() {
   // Facturas con datos del cliente y del deudor
   const { data: rawInvoices } = await supabase
     .from('invoices')
-    .select('id, invoice_number, amount, issue_date, due_date, status, is_guaranteed, file_url, client_id, payer_id')
+    .select('id, invoice_number, amount, issue_date, due_date, status, is_guaranteed, file_url, client_id, payer_id, legal_declarations')
     .order('issue_date', { ascending: false })
 
   const invoices = rawInvoices || []
@@ -58,15 +61,18 @@ export default async function AdminInvoicesPage() {
     })
   )
 
+  // Filtrar facturas anuladas para cálculos financieros
+  const activeInvoices = invoices.filter(i => !(i.legal_declarations as any)?.anulada)
+
   // KPIs
-  const totalCount     = invoices.length
-  const totalValue     = invoices.reduce((acc, i) => acc + Number(i.amount || 0), 0)
-  const guaranteedCount = invoices.filter(i => i.is_guaranteed).length
-  const guaranteedValue = invoices.filter(i => i.is_guaranteed).reduce((acc, i) => acc + Number(i.amount || 0), 0)
+  const totalCount     = activeInvoices.length
+  const totalValue     = activeInvoices.reduce((acc, i) => acc + Number(i.amount || 0), 0)
+  const guaranteedCount = activeInvoices.filter(i => i.is_guaranteed).length
+  const guaranteedValue = activeInvoices.filter(i => i.is_guaranteed).reduce((acc, i) => acc + Number(i.amount || 0), 0)
 
   // Datos del gráfico — agrupados por mes
   const monthlyMap: Record<string, { name: string; total: number }> = {}
-  for (const inv of invoices) {
+  for (const inv of activeInvoices) {
     const date  = new Date(inv.issue_date)
     const key   = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
     const label = date.toLocaleDateString('es-CO', { month: 'short', year: 'numeric' })
@@ -104,91 +110,7 @@ export default async function AdminInvoicesPage() {
       </div>
 
       {/* Tabla de detalle */}
-      <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-          <div>
-            <h2 className="text-base font-semibold text-gray-900">Detalle de Facturas</h2>
-            <p className="text-sm text-gray-500">{totalCount} factura(s) en total</p>
-          </div>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-100">
-            <thead className="bg-gray-50">
-              <tr>
-                {['# Factura', 'Cliente', 'Deudor', 'Emisión', 'Vencimiento', 'Valor', 'Días Mora', 'Estado', 'PDF'].map(h => (
-                  <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50 bg-white">
-              {invoicesWithUrls.length === 0 && (
-                <tr>
-                  <td colSpan={9} className="text-center py-12 text-gray-400 text-sm">
-                    No hay facturas registradas.
-                  </td>
-                </tr>
-              )}
-              {invoicesWithUrls.map((inv) => {
-                const today = new Date()
-                const due   = new Date(inv.due_date)
-                const diasMora = inv.status !== 'pagada' && due < today
-                  ? Math.floor((today.getTime() - due.getTime()) / 86_400_000)
-                  : 0
-                const displayStatus = getDisplayStatus(inv.status, diasMora)
-                return (
-                <tr key={inv.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-4 py-3 text-sm font-semibold text-gray-900 whitespace-nowrap">
-                    {inv.invoice_number}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">
-                    {profileMap[inv.client_id] || '—'}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">
-                    {payerMap[inv.payer_id] || '—'}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">
-                    {new Date(inv.issue_date).toLocaleDateString('es-CO')}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">
-                    {new Date(inv.due_date).toLocaleDateString('es-CO')}
-                  </td>
-                  <td className="px-4 py-3 text-sm font-semibold text-gray-900 whitespace-nowrap">
-                    {formatCurrency(Number(inv.amount))}
-                  </td>
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    {diasMora > 0
-                      ? <span className="text-xs font-bold text-red-600">{diasMora} días</span>
-                      : <span className="text-xs text-gray-400">—</span>
-                    }
-                  </td>
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    <span className={`text-xs font-medium px-2.5 py-1 rounded-full capitalize ${STATUS_STYLES[displayStatus] ?? 'bg-gray-100 text-gray-600'}`}>
-                      {displayStatus}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">
-                    {inv.signedUrl ? (
-                      <a
-                        href={inv.signedUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        title="Ver / Descargar PDF"
-                        className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-colors"
-                      >
-                        <Download className="w-4 h-4" />
-                      </a>
-                    ) : (
-                      <span className="text-gray-300 text-xs">—</span>
-                    )}
-                  </td>
-                </tr>
-              )})}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <AdminInvoicesTable invoices={invoicesWithUrls as any} profileMap={profileMap} payerMap={payerMap} />
     </div>
   )
 }

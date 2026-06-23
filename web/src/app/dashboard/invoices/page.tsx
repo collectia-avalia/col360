@@ -13,11 +13,16 @@ export default async function InvoicesPage({
   const supabase = await createClient()
   const profile = await getUserProfile(supabase)
 
-  const { data: invoices } = await supabase
+  const { data: rawInvoices } = await supabase
     .from('invoices')
     .select('*, payers(razon_social)')
     .eq('company_id', profile?.company_id)
     .order('created_at', { ascending: false })
+
+  const invoices = (rawInvoices || []).filter(inv => {
+    const decls = inv.legal_declarations as any
+    return !decls?.anulada
+  })
 
   const filterStatusParam = typeof params['status'] === 'string' ? params['status'] : undefined
   const initialFilterStatus = filterStatusParam && ['vigente', 'vencida', 'pagada'].includes(filterStatusParam) ? filterStatusParam : 'todos'

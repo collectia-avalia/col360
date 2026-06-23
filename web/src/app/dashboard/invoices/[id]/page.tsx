@@ -20,7 +20,7 @@ export default async function InvoiceDetailPage({
     .eq('id', id)
     .single()
 
-  if (!invoice) {
+  if (!invoice || (invoice.legal_declarations as any)?.anulada) {
     notFound()
   }
 

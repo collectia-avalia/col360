@@ -74,13 +74,13 @@ export default async function AdminDashboard({
         credit_study_fee
       )
     `),
-    supabase.from('invoices').select('amount, created_at, is_guaranteed, status, due_date'),
+    supabase.from('invoices').select('amount, created_at, is_guaranteed, status, due_date, legal_declarations'),
   ])
 
   // 2. Procesar Métricas Globales
   const clientsList = allClients || []
   const payersList = allPayers || []
-  const invoicesList = allInvoices || []
+  const invoicesList = (allInvoices || []).filter(i => !(i.legal_declarations as any)?.anulada)
 
   const totalBagValue = clientsList.reduce((sum, c) => sum + (Number(c.total_bag) || 0), 0)
   const approvedPayers = payersList.filter(p => p.risk_status === 'aprobado')
