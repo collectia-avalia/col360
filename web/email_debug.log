@@ -18,3 +18,7 @@
 [2026-03-17T19:37:39.028Z] Éxito. ID de mensaje: a833d569-d173-4249-afd0-35d3d3bb3f51
 [2026-03-17T23:21:50.756Z] Intentando enviar a: operaciones@collectiabpo.com, Asunto: Recordatorio: Completa tu Estudio de Credito - Avalia (Key length: 36)
 [2026-03-17T23:21:51.212Z] Éxito. ID de mensaje: 9bc1d4b7-ce61-4ce4-96cf-672731b068ff
+[2026-06-23T22:56:05.812Z] Intentando enviar a: operaciones@collectiabpo.com, Asunto: ¡Bienvenido a Avalia! Tu cupo de crédito comercial ha sido aprobado (Prueba) (Key length: 36)
+[2026-06-23T22:56:05.820Z] Error inesperado: Objects are not valid as a React child (found: object with keys {$$typeof, type, key, props, _owner, _store}). If you meant to render a collection of children, use an array instead.
+[2026-06-23T22:56:50.417Z] Intentando enviar a: operaciones@collectiabpo.com, Asunto: ¡Bienvenido a Avalia! Tu cupo de crédito comercial ha sido aprobado (Prueba) (Key length: 36)
+[2026-06-23T22:56:50.926Z] Éxito. ID de mensaje: b3396bd7-c0d0-47be-91bb-e99348cc6d76

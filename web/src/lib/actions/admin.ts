@@ -2,6 +2,10 @@
 
 import { createAdminClient } from '@/lib/supabase/admin'
 import { revalidatePath } from 'next/cache'
+import React from 'react'
+import { renderToString } from 'react-dom/server'
+import { sendEmail } from '@/lib/actions/email'
+import { PayerWelcomeEmail } from '@/components/emails/PayerWelcomeEmail'
 
 // --- GESTIÓN DE CLIENTES ---
 
@@ -112,6 +116,60 @@ export async function approvePayerAction(payerId: string, amount: number) {
             .eq('id', payerId)
 
         if (error) throw new Error(error.message)
+
+        // Consultar los datos del pagador y del cliente creador para enviar la notificación
+        try {
+            const { data: payerData, error: fetchError } = await supabase
+                .from('payers')
+                .select(`
+                    razon_social,
+                    contact_name,
+                    contact_email,
+                    profiles:created_by (
+                        company_name
+                    )
+                `)
+                .eq('id', payerId)
+                .single()
+
+            if (fetchError) {
+                console.error('[ADMIN] Error consultando pagador para correo:', fetchError)
+            } else if (payerData && payerData.contact_email) {
+                const clientName = (payerData.profiles as any)?.company_name || 'Avalia'
+                const formattedQuota = new Intl.NumberFormat('es-CO', {
+                    style: 'currency',
+                    currency: 'COP',
+                    maximumFractionDigits: 0
+                }).format(amount)
+
+                // Renderizar la plantilla a HTML string
+                const htmlContent = renderToString(
+                    React.createElement(PayerWelcomeEmail, {
+                        contactName: payerData.contact_name || 'Contacto',
+                        razonSocial: payerData.razon_social,
+                        approvedQuota: formattedQuota,
+                        clientName: clientName,
+                    })
+                )
+
+                // Enviar correo de bienvenida al pagador (deudor)
+                const emailResult = await sendEmail({
+                    to: payerData.contact_email,
+                    subject: '¡Bienvenido a Avalia! Tu cupo de crédito comercial ha sido aprobado',
+                    html: htmlContent
+                })
+
+                if (!emailResult.success) {
+                    console.error('[ADMIN] Error enviando correo de bienvenida:', emailResult.error)
+                } else {
+                    console.log('[ADMIN] Correo de bienvenida enviado con éxito a:', payerData.contact_email)
+                }
+            } else {
+                console.warn('[ADMIN] No se pudo enviar correo de bienvenida. Datos faltantes o email vacío:', payerData)
+            }
+        } catch (emailErr) {
+            console.error('[ADMIN] Excepción al procesar correo de bienvenida:', emailErr)
+        }
 
         revalidatePath('/admin/approvals')
         revalidatePath(`/admin/approvals/${payerId}`)
