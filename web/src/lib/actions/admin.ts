@@ -3,9 +3,8 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { revalidatePath } from 'next/cache'
 import React from 'react'
-import { renderToString } from 'react-dom/server'
 import { sendEmail } from '@/lib/actions/email'
-import { PayerWelcomeEmail } from '@/components/emails/PayerWelcomeEmail'
+import { PayerWelcomeHtml } from '@/components/emails/htmlTemplates'
 
 // --- GESTIÓN DE CLIENTES ---
 
@@ -142,15 +141,13 @@ export async function approvePayerAction(payerId: string, amount: number) {
                     maximumFractionDigits: 0
                 }).format(amount)
 
-                // Renderizar la plantilla a HTML string
-                const htmlContent = renderToString(
-                    React.createElement(PayerWelcomeEmail, {
-                        contactName: payerData.contact_name || 'Contacto',
-                        razonSocial: payerData.razon_social,
-                        approvedQuota: formattedQuota,
-                        clientName: clientName,
-                    })
-                )
+                // Obtener el HTML string del correo de bienvenida
+                const htmlContent = PayerWelcomeHtml({
+                    contactName: payerData.contact_name || 'Contacto',
+                    razonSocial: payerData.razon_social,
+                    approvedQuota: formattedQuota,
+                    clientName: clientName,
+                })
 
                 // Enviar correo de bienvenida al pagador (deudor)
                 const emailResult = await sendEmail({

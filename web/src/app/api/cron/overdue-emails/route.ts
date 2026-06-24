@@ -1,15 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import React from 'react';
-import { renderToString } from 'react-dom/server';
 import { sendEmail } from '@/lib/actions/email';
 
-// Importar plantillas de cobro
-import { Mora1Email } from '@/components/emails/Mora1Email';
-import { Mora5Email } from '@/components/emails/Mora5Email';
-import { Mora10Email } from '@/components/emails/Mora10Email';
-import { Mora15Email } from '@/components/emails/Mora15Email';
-import { Mora30Email } from '@/components/emails/Mora30Email';
+// Importar plantillas de cobro en formato HTML String
+import { 
+    Mora1Html, 
+    Mora5Html, 
+    Mora10Html, 
+    Mora15Html, 
+    Mora30Html 
+} from '@/components/emails/htmlTemplates';
 
 // Evitar almacenamiento en caché de Next.js
 export const dynamic = 'force-dynamic';
@@ -149,7 +149,7 @@ export async function GET(request: NextRequest) {
                 const formattedAmount = formatCurrency(Number(invoice.amount));
                 const formattedDueDate = formatLongDate(invoice.due_date);
 
-                let emailTemplate: React.ReactElement | null = null;
+                let htmlContent = '';
                 let subject = '';
                 let templateName = '';
 
@@ -158,7 +158,7 @@ export async function GET(request: NextRequest) {
                     case 1:
                         subject = `Recordatorio de pago: Factura N° ${invoiceNum} - ${clientName}`;
                         templateName = 'Mora Día 1';
-                        emailTemplate = React.createElement(Mora1Email, {
+                        htmlContent = Mora1Html({
                             contactName,
                             razonSocial,
                             invoiceNumber: invoiceNum,
@@ -170,7 +170,7 @@ export async function GET(request: NextRequest) {
                     case 5:
                         subject = `Segunda notificación: Pago pendiente Factura N° ${invoiceNum} - ${clientName}`;
                         templateName = 'Mora Día 5';
-                        emailTemplate = React.createElement(Mora5Email, {
+                        htmlContent = Mora5Html({
                             contactName,
                             razonSocial,
                             invoiceNumber: invoiceNum,
@@ -182,7 +182,7 @@ export async function GET(request: NextRequest) {
                     case 10:
                         subject = `Notificación urgente de mora: Factura N° ${invoiceNum} - ${clientName}`;
                         templateName = 'Mora Día 10';
-                        emailTemplate = React.createElement(Mora10Email, {
+                        htmlContent = Mora10Html({
                             contactName,
                             razonSocial,
                             invoiceNumber: invoiceNum,
@@ -194,7 +194,7 @@ export async function GET(request: NextRequest) {
                     case 15:
                         subject = `Suspensión de cupo: Notificación de mora Factura N° ${invoiceNum} - ${clientName}`;
                         templateName = 'Mora Día 15';
-                        emailTemplate = React.createElement(Mora15Email, {
+                        htmlContent = Mora15Html({
                             contactName,
                             razonSocial,
                             invoiceNumber: invoiceNum,
@@ -206,7 +206,7 @@ export async function GET(request: NextRequest) {
                     case 30:
                         subject = `Bloqueo definitivo y reporte central de riesgo: Factura N° ${invoiceNum} - ${clientName}`;
                         templateName = 'Mora Día 30';
-                        emailTemplate = React.createElement(Mora30Email, {
+                        htmlContent = Mora30Html({
                             contactName,
                             razonSocial,
                             invoiceNumber: invoiceNum,
@@ -217,11 +217,9 @@ export async function GET(request: NextRequest) {
                         break;
                 }
 
-                if (emailTemplate && subject) {
+                if (htmlContent && subject) {
                     console.log(`[CRON] Enviando correo de ${templateName} a ${contactEmail} para factura ${invoiceNum}`);
                     
-                    const htmlContent = renderToString(emailTemplate);
-
                     const result = await sendEmail({
                         to: contactEmail,
                         subject: subject,
