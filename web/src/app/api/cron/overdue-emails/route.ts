@@ -53,9 +53,15 @@ export async function GET(request: NextRequest) {
     const cronSecret = process.env.CRON_SECRET;
     const isDev = process.env.NODE_ENV === 'development';
 
-    if (cronSecret && authHeader !== `Bearer ${cronSecret}` && !isDev) {
-        console.warn('[CRON] Intento de acceso no autorizado bloqueado');
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (!isDev) {
+        if (!cronSecret) {
+            console.error('[CRON] ERROR CRÍTICO: CRON_SECRET no configurado en producción.');
+            return NextResponse.json({ error: 'Configuration Error' }, { status: 500 });
+        }
+        if (authHeader !== `Bearer ${cronSecret}`) {
+            console.warn('[CRON] Intento de acceso no autorizado bloqueado');
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
     }
 
     // 2. Inicializar cliente administrador de Supabase para omitir RLS

@@ -56,6 +56,38 @@ export async function createInvoiceAction(formData: FormData) {
   const { invoiceNumber, payerId, amount, issueDate, dueDate } = validation.data
   const numericAmount = parseFloat(amount)
 
+  // --- VALIDACIÓN DE BLOQUEO POR MORA ---
+  const formatter = new Intl.DateTimeFormat('fr-CA', {
+    timeZone: 'America/Bogota',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  })
+  const todayBogotaStr = formatter.format(new Date())
+
+  const { data: overdueInvoices, error: overdueError } = await supabase
+    .from('invoices')
+    .select('id, legal_declarations')
+    .eq('payer_id', payerId)
+    .neq('status', 'pagada')
+    .lt('due_date', todayBogotaStr)
+
+  if (overdueError) {
+    console.error('Error consultando mora del pagador:', overdueError)
+    return { error: 'Error consultando facturas en mora' }
+  }
+
+  // Filtrar facturas anuladas
+  const actualOverdue = (overdueInvoices || []).filter(inv => {
+    const isAnulada = inv.legal_declarations && (inv.legal_declarations as any).anulada === true
+    return !isAnulada
+  })
+
+  if (actualOverdue.length > 0) {
+    return { error: 'El deudor (pagador) seleccionado presenta facturas en mora. No se permite radicar nuevas facturas a su nombre hasta que se ponga al día.' }
+  }
+  // --------------------------------------
+
   // 2. Lógica de Negocio: Calcular Garantía
   // Consultar Pagador
   const { data: payer, error: payerError } = await supabase

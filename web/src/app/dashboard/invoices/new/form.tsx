@@ -1,7 +1,7 @@
 'use client'
 
 import { createInvoiceAction } from '../actions'
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useEffect } from 'react'
 import Link from 'next/link'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { Loader2, UploadCloud, FileText, Calendar, DollarSign, ShieldCheck } from 'lucide-react'
@@ -30,14 +30,31 @@ type PayerOption = {
   id: string
   razon_social: string
   nit: string
+  inMora?: boolean
 }
 
 export default function NewInvoiceForm({ payers }: { payers: PayerOption[] }) {
   const router = useRouter()
   const { toast } = useToast()
   const searchParams = useSearchParams()
-  const defaultPayerId = searchParams.get('payerId') || ''
-  const [selectedPayerId, setSelectedPayerId] = useState(defaultPayerId)
+
+  // Sanitizar el parámetro inicial para no precargar deudores en mora
+  const [selectedPayerId, setSelectedPayerId] = useState(() => {
+    const initialId = searchParams.get('payerId') || ''
+    const foundPayer = payers.find(p => p.id === initialId)
+    return foundPayer && !foundPayer.inMora ? initialId : ''
+  })
+
+  // Hook para disparar Toast de advertencia si intentó cargar un deudor bloqueado
+  useEffect(() => {
+    const initialId = searchParams.get('payerId')
+    if (initialId) {
+      const foundPayer = payers.find(p => p.id === initialId)
+      if (foundPayer?.inMora) {
+        toast(`El deudor "${foundPayer.razon_social}" se encuentra en mora y está bloqueado.`, 'error')
+      }
+    }
+  }, [searchParams, payers, toast])
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
   const [fileName, setFileName] = useState<string | null>(null)
@@ -90,7 +107,14 @@ export default function NewInvoiceForm({ payers }: { payers: PayerOption[] }) {
                             (nCustomer.length === nP.length + 1 && nCustomer.startsWith(nP)) ||
                             (nP.length === nCustomer.length + 1 && nP.startsWith(nCustomer))
                     })
-                    if (found) setSelectedPayerId(found.id)
+                    if (found) {
+                        if (found.inMora) {
+                            toast(`El deudor "${found.razon_social}" identificado en el PDF se encuentra en mora y está bloqueado.`, 'error')
+                            setSelectedPayerId('')
+                        } else {
+                            setSelectedPayerId(found.id)
+                        }
+                    }
                 }
                 setParsedData({
                     invoiceNumber: data.invoiceNumber,
@@ -172,7 +196,14 @@ export default function NewInvoiceForm({ payers }: { payers: PayerOption[] }) {
                     (nNit.length === nP.length + 1 && nNit.startsWith(nP)) ||
                     (nP.length === nNit.length + 1 && nP.startsWith(nNit))
             })
-            if (found) setSelectedPayerId(found.id)
+            if (found) {
+                if (found.inMora) {
+                    toast(`El deudor "${found.razon_social}" identificado en el XML se encuentra en mora y está bloqueado.`, 'error')
+                    setSelectedPayerId('')
+                } else {
+                    setSelectedPayerId(found.id)
+                }
+            }
             return found
         }
 
@@ -187,7 +218,12 @@ export default function NewInvoiceForm({ payers }: { payers: PayerOption[] }) {
                 })
                 if (found) {
                     payerNit = cid.textContent
-                    setSelectedPayerId(found.id)
+                    if (found.inMora) {
+                        toast(`El deudor "${found.razon_social}" identificado en el XML se encuentra en mora y está bloqueado.`, 'error')
+                        setSelectedPayerId('')
+                    } else {
+                        setSelectedPayerId(found.id)
+                    }
                     break
                 }
             }
@@ -334,7 +370,9 @@ export default function NewInvoiceForm({ payers }: { payers: PayerOption[] }) {
               >
                 <option value="">-- Selecciona un pagador --</option>
                 {payers.map(p => (
-                    <option key={p.id} value={p.id}>{p.razon_social} (NIT: {p.nit})</option>
+                    <option key={p.id} value={p.id} disabled={p.inMora}>
+                        {p.razon_social} (NIT: {p.nit}){p.inMora ? ' - ⚠️ BLOQUEADO POR MORA' : ''}
+                    </option>
                 ))}
               </select>
               {payers.length === 0 && (
