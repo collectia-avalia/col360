@@ -49,7 +49,8 @@ export default async function PayerDetailsPage({ params }: { params: Promise<{ i
   const status = statusConfig[payer.risk_status as keyof typeof statusConfig] || statusConfig.pendiente
   const StatusIcon = status.icon
 
-  const documents = (payer.payer_documents || []) as any[]
+  // Excluir la historia de crédito de los documentos visibles para el cliente (confidencial)
+  const documents = ((payer.payer_documents || []) as any[]).filter((doc: any) => doc.doc_type !== 'historia_credito')
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">

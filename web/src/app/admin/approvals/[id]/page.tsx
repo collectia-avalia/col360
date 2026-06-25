@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { ArrowLeft, FileText, Download, ShieldCheck, Award, Pencil } from 'lucide-react'
 import DecisionForm from './decision-form'
 import { DigitalCertificate } from '@/components/DigitalCertificate'
+import CreditStudyPanel from './credit-study-panel'
 
 export default async function ApprovalDetailPage({ 
   params, 
@@ -15,6 +16,11 @@ export default async function ApprovalDetailPage({
   const { id } = await params
   const sParams = await searchParams
   const isEditing = sParams['edit'] === 'true'
+  
+  // Leer valores de auto-relleno sugeridos por el análisis de IA
+  const suggestedQuotaRaw = sParams['suggestedQuota'] as string | undefined
+  const suggestedQuota = suggestedQuotaRaw ? parseFloat(suggestedQuotaRaw) : undefined
+  const suggestedReason = sParams['suggestedReason'] as string | undefined
   
   const supabaseAdmin = createAdminClient()
   const supabase = await createClient()
@@ -47,7 +53,11 @@ export default async function ApprovalDetailPage({
     .select('*')
     .eq('payer_id', payerId)
 
-  const docsWithUrls = (documents || [])
+  const rawDocs = documents || []
+  // Separar la historia de crédito confidencial
+  const historyDoc = rawDocs.find((doc: any) => doc.doc_type === 'historia_credito')
+  // Documentos para la lista regular (excluyendo historia_credito)
+  const docsWithUrls = rawDocs.filter((doc: any) => doc.doc_type !== 'historia_credito')
 
   return (
     <div className="max-w-4xl mx-auto pb-12">
@@ -86,8 +96,16 @@ export default async function ApprovalDetailPage({
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        {/* Columna Izquierda: Info y Documentos */}
+        {/* Columna Izquierda: Info, Estudio SARC y Documentos */}
         <div className="lg:col-span-2 space-y-6">
+            
+            {/* Tarjeta de Estudio de Crédito SARC Wy CF */}
+            <CreditStudyPanel 
+              payerId={payerId}
+              payerName={payer.razon_social}
+              historyDoc={historyDoc}
+              studyResult={payer.credit_study_result}
+            />
             
             {/* Tarjeta Info Pagador */}
             <div className="bg-white shadow overflow-hidden sm:rounded-lg">
@@ -238,7 +256,13 @@ export default async function ApprovalDetailPage({
 
             {/* Mostrar panel de decisión si está pendiente, en estudio, o si el admin quiere editar */}
             {(payer.risk_status === 'pendiente' || payer.risk_status === 'en estudio' || isEditing) ? (
-                <DecisionForm payerId={payerId} initialReason={payer.rejection_reason} />
+                <DecisionForm 
+                  key={suggestedQuotaRaw || 'default'}
+                  payerId={payerId} 
+                  initialReason={payer.rejection_reason} 
+                  suggestedQuota={suggestedQuota}
+                  suggestedReason={suggestedReason}
+                />
             ) : (
                 <div className="bg-white shadow sm:rounded-lg overflow-hidden">
                     <div className={`h-2 ${payer.risk_status === 'aprobado' ? 'bg-green-500' : 'bg-red-500'}`} />

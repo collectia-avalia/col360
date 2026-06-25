@@ -132,7 +132,7 @@ export function PayersList({ payers, role }: { payers: Payer[], role?: string })
     const overdueValue = overdueInvoices.reduce((sum: number, inv: any) => sum + (inv.amount || 0), 0)
     const consumedQuota = activeValue + overdueValue // Total consumido (Vigente + Vencido)
     const invoiceCount = (payer.invoices?.length || 0)
-    const docCount = (payer.payer_documents?.length || 0)
+    const docCount = (payer.payer_documents?.filter((d: any) => d.doc_type !== 'historia_credito')?.length || 0)
 
     return {
       ...payer,

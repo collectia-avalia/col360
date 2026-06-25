@@ -5,7 +5,17 @@ import { useState, useTransition } from 'react'
 import { Loader2, CheckCircle, XCircle } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 
-export default function DecisionForm({ payerId, initialReason }: { payerId: string, initialReason?: string }) {
+export default function DecisionForm({ 
+  payerId, 
+  initialReason,
+  suggestedQuota,
+  suggestedReason
+}: { 
+  payerId: string, 
+  initialReason?: string,
+  suggestedQuota?: number,
+  suggestedReason?: string
+}) {
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
@@ -71,6 +81,7 @@ export default function DecisionForm({ payerId, initialReason }: { payerId: stri
                   id="amount"
                   className="focus:ring-green-500 focus:border-green-500 block w-full pl-7 pr-12 sm:text-sm border-gray-300 rounded-md py-2"
                   placeholder="0.00"
+                  defaultValue={suggestedQuota || ''}
                   required
                 />
               </div>
@@ -100,10 +111,10 @@ export default function DecisionForm({ payerId, initialReason }: { payerId: stri
                 <textarea
                   id="reason"
                   name="reason"
-                  rows={2}
-                  className="shadow-sm focus:ring-red-500 focus:border-red-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                  rows={4}
+                  className="shadow-sm focus:ring-red-500 focus:border-red-500 block w-full sm:text-sm border-gray-300 rounded-md p-2"
                   placeholder="Explica por qué se rechaza..."
-                  defaultValue={initialReason}
+                  defaultValue={suggestedReason || initialReason || ''}
                 />
               </div>
               <div className="mt-4">
