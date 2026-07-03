@@ -204,10 +204,10 @@ export async function analyzeCreditStudyAction(payerId: string) {
 
         console.log(`[ANALYZE] PDF parseado con éxito. Longitud del texto: ${pdfText.length} caracteres.`)
 
-        // 5. Configurar llamada a la API de Gemini
-        const geminiApiKey = process.env.GEMINI_API_KEY
-        if (!geminiApiKey) {
-            return { error: 'La clave de API de Gemini (GEMINI_API_KEY) no está configurada en las variables de entorno.' }
+        // 5. Configurar llamada a la API de OpenAI
+        const openaiApiKey = process.env.OPENAI_API_KEY
+        if (!openaiApiKey) {
+            return { error: 'La clave de API de OpenAI (OPENAI_API_KEY) no está configurada en las variables de entorno.' }
         }
 
         // Construcción del Prompt con la Metodología
@@ -331,34 +331,38 @@ Debes responder ÚNICAMENTE con un objeto JSON válido con la siguiente estructu
 No agregues texto introductorio ni explicaciones fuera del JSON. Devuelve únicamente el objeto JSON parseable.
 `;
 
-        // Realizar la llamada HTTP a Gemini API
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`, {
+        // Realizar la llamada HTTP a OpenAI API
+        const response = await fetch('https://api.openai.com/v1/chat/completions', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${openaiApiKey}`
             },
             body: JSON.stringify({
-                contents: [
+                model: 'gpt-4o',
+                messages: [
                     {
-                        parts: [
-                            { text: promptText }
-                        ]
+                        role: 'system',
+                        content: 'Eres un analista experto de riesgo y crédito de AVALIA. Tu tarea es analizar historias de crédito y retornar un objeto JSON válido según el scoring SARC Wy CF.'
+                    },
+                    {
+                        role: 'user',
+                        content: promptText
                     }
                 ],
-                generationConfig: {
-                    responseMimeType: "application/json"
-                }
+                response_format: { type: 'json_object' },
+                temperature: 0.2
             })
         })
 
         if (!response.ok) {
             const errText = await response.text()
-            console.error('[ANALYZE] Error en la API de Gemini:', errText)
-            return { error: 'Error en el servicio de IA de Gemini al procesar la solicitud.' }
+            console.error('[ANALYZE] Error en la API de OpenAI:', errText)
+            return { error: 'Error en el servicio de IA de OpenAI al procesar la solicitud.' }
         }
 
         const resJson = await response.json()
-        const textResponse = resJson.candidates?.[0]?.content?.parts?.[0]?.text
+        const textResponse = resJson.choices?.[0]?.message?.content
 
         if (!textResponse) {
             return { error: 'La IA no devolvió un análisis procesable.' }
