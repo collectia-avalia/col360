@@ -280,6 +280,7 @@ export async function analyzeCreditStudyAction(payerId: string) {
 Eres un analista experto de riesgo y crédito de AVALIA. Tu tarea es analizar la historia de crédito adjunta de una Persona Jurídica (PJ) colombiana, complementar con los datos financieros básicos del deudor y los documentos de balance o estados de resultados provistos, y retornar un análisis estructurado de scoring según el modelo SARC Wy CF de Avalia.
 
 METODOLOGÍA SARC WY CF Y REGLAS DE CUPO (APLICACIÓN ESTRICTA):
+ATENCIÓN AL ORDEN CRONOLÓGICO DE LAS COLUMNAS: En los documentos financieros provistos (Balance y PYG), la columna izquierda representa el año más reciente (dic-2025) y la columna derecha representa el año anterior (dic-2024). No confundas el orden temporal: el presente es la columna izquierda y el pasado es la columna derecha. Compara siempre el presente (izquierda) contra el pasado (derecha) para determinar si las variables son crecientes o decrecientes.
 1. Ponderación por bloques:
    - Bloque 1 (Variables Financieras y de Riesgo): Peso 35%. Variables:
      * Disponible vs Capacidad de Pago (Efectivo y Equivalentes / Pasivo Corriente):
@@ -297,7 +298,7 @@ METODOLOGÍA SARC WY CF Y REGLAS DE CUPO (APLICACIÓN ESTRICTA):
        - Si el score Experian está en el rango de 601 a 700: Asigna exactamente 200 pts.
        - Si el score Experian es mayor a 700: Asigna exactamente 400 pts.
      * Composición de Deuda Consumo (Deuda Consumo / Deuda Total): <30% (100 pts), >30% (0 pts).
-     * Variación de Endeudamiento (último trimestre): Inferior al 20% (100 pts), Superior al 20% (0 pts).
+     * Variación de Endeudamiento (último trimestre): Compara el Saldo Total Actual de deuda del buró con el Saldo del trimestre anterior que figuran en el reporte de Experian (ej. para Tableros, la variación entre $386.806 y $354.952 es 9.0%). Si esta variación es inferior al 20%, califica con 100 pts. Si es superior, califica con 0 pts.
      * Nota: El Subtotal de Bloque 1 se normaliza sobre un máximo de 1200 puntos a escala 0-1000. Si el score Experian restó -1000 pts, el subtotal de Bloque 1 puede dar negativo; en tal caso, el puntaje normalizado del Bloque 1 es 0.
    - Bloque 2 (Variables Propias del Negocio): Peso 35%. Variables:
      * Antigüedad del negocio: <40 meses (0 pts), 40-59 meses (200 pts), >=60 meses (400 pts).
