@@ -308,7 +308,7 @@ METODOLOGÍA SARC WY CF Y REGLAS DE CUPO (APLICACIÓN ESTRICTA):
      * Liquidez - Razón Corriente (Act. Corriente / Pas. Corriente): <1.5 (0 pts), 1.5-2.5 (200 pts), >2.5 (100 pts).
      * Liquidez - Prueba Ácida ((Act. Corriente - Inventarios) / Pas. Corriente): >=1.0 (o cercano a 0.98) (200 pts), otro valor (0 pts).
      * Endeudamiento - Cobertura de Intereses (EBITDA / Gastos Intereses): >3.0x (200 pts), <=3.0x (0 pts). (Si la utilidad operacional es negativa, la cobertura es negativa y da 0 pts).
-     * Rentabilidad - Margen Neto: Creciente últimos 2 años (200 pts), Estable (100 pts), Decreciente (0 pts).
+     * Rentabilidad - Margen Neto (Utilidad Neta / Ingresos Operacionales): Calcula el margen neto de dic-2025 (Utilidad Neta 2025 / Ingresos 2025) y compáralo con el de dic-2024. Si el margen neto de 2025 es superior al de 2024, la tendencia es Creciente (200 pts). Si es igual es Estable (100 pts), y si es menor es Decreciente (0 pts). No te dejes confundir por caídas en el total de ventas operacionales, el margen neto es un porcentaje.
      * Rentabilidad - ROE (Ut. Neta / Patrimonio): > Costo de oportunidad (200 pts), < Costo de oportunidad (0 pts).
      * Nota: El Subtotal de Bloque 3 se normaliza sobre un máximo de 1000 puntos a escala 0-1000.
    - Score Final = (Normalizado Bloque 1 * 0.35) + (Normalizado Bloque 2 * 0.35) + (Normalizado Bloque 3 * 0.30).
@@ -447,7 +447,109 @@ No agregues texto introductorio ni explicaciones fuera del JSON. Devuelve única
 
         // 6. Deserializar el JSON y validar
         const analysisResult = JSON.parse(textResponse.trim())
-        const scoreSarc = Number(analysisResult.score || 0)
+
+        // Recálculo determinista de scoring SARC Wy CF
+        let scoreSarc = 0
+        try {
+            // A. Bloque 1
+            const block1Vars = analysisResult.blocks?.block1?.variables || []
+            let block1Subtotal = 0
+            block1Vars.forEach((v: any) => {
+                block1Subtotal += Number(v.points || 0)
+            })
+            let block1Normalized = Math.round((block1Subtotal / 1200) * 1000)
+            if (block1Normalized < 0) block1Normalized = 0
+
+            // B. Bloque 2
+            const block2Vars = analysisResult.blocks?.block2?.variables || []
+            let block2Subtotal = 0
+            block2Vars.forEach((v: any) => {
+                block2Subtotal += Number(v.points || 0)
+            })
+            let block2Normalized = Math.round((block2Subtotal / 1200) * 1000)
+            if (block2Normalized < 0) block2Normalized = 0
+
+            // C. Bloque 3
+            const block3Vars = analysisResult.blocks?.block3?.variables || []
+            let block3Subtotal = 0
+            block3Vars.forEach((v: any) => {
+                block3Subtotal += Number(v.points || 0)
+            })
+            let block3Normalized = Math.round((block3Subtotal / 1000) * 1000)
+            if (block3Normalized < 0) block3Normalized = 0
+
+            // D. Score Final = (Block1 * 35%) + (Block2 * 35%) + (Block3 * 30%)
+            const finalScore = Math.round(
+                (block1Normalized * 0.35) + 
+                (block2Normalized * 0.35) + 
+                (block3Normalized * 0.30)
+            )
+
+            // E. Ajustar categorías y cupos según el Score Final real
+            let category = "No aprueba por modelo"
+            let riskLevel = "alto"
+            let multiplier = 0.0
+            let recommendedTerm = 0
+
+            if (finalScore >= 750) {
+                category = "AA"
+                riskLevel = "bajo"
+                multiplier = 2.0
+                recommendedTerm = 60
+            } else if (finalScore >= 500) {
+                category = "A"
+                riskLevel = "medio"
+                multiplier = 1.5
+                recommendedTerm = 45
+            }
+
+            // Excepción por Ley 550 / Reestructuración (Cualitativo superior)
+            const lowerSummary = (analysisResult.executiveSummary || '').toLowerCase()
+            const lowerVerdict = (analysisResult.dimensions || []).map((d: any) => (d.verdict || '').toLowerCase()).join(' ')
+            const isRestructured = lowerSummary.includes('ley 550') || lowerSummary.includes('reestructuracion') || lowerSummary.includes('reestructuración') ||
+                                   lowerVerdict.includes('ley 550') || lowerVerdict.includes('reestructuracion') || lowerVerdict.includes('reestructuración')
+            
+            if (isRestructured) {
+                category = "No aprueba por modelo"
+                riskLevel = "alto"
+                multiplier = 0.0
+                recommendedTerm = 0
+            }
+
+            const netUtility = Number(payer.net_utility || 0)
+            const netUtilityMonthly = Math.round(netUtility / 12)
+            const recommendedQuota = Math.round(netUtilityMonthly * multiplier)
+
+            // Re-escribir de forma exacta y matemática los valores reales en el JSON final
+            analysisResult.score = finalScore
+            analysisResult.category = category
+            
+            if (!analysisResult.blocks) analysisResult.blocks = {}
+            if (!analysisResult.blocks.block1) analysisResult.blocks.block1 = {}
+            analysisResult.blocks.block1.subtotal = block1Subtotal
+            analysisResult.blocks.block1.normalized = block1Normalized
+
+            if (!analysisResult.blocks.block2) analysisResult.blocks.block2 = {}
+            analysisResult.blocks.block2.subtotal = block2Subtotal
+            analysisResult.blocks.block2.normalized = block2Normalized
+
+            if (!analysisResult.blocks.block3) analysisResult.blocks.block3 = {}
+            analysisResult.blocks.block3.subtotal = block3Subtotal
+            analysisResult.blocks.block3.normalized = block3Normalized
+
+            if (!analysisResult.quota) analysisResult.quota = {}
+            analysisResult.quota.netUtilityMonthly = netUtilityMonthly
+            analysisResult.quota.riskLevel = riskLevel
+            analysisResult.quota.multiplier = multiplier
+            analysisResult.quota.recommendedQuota = recommendedQuota
+            analysisResult.quota.recommendedTerm = recommendedTerm
+
+            scoreSarc = finalScore
+            console.log(`[ANALYZE_MATH] Aritmética recalculada con éxito. Score Final: ${finalScore}, Cupo: ${recommendedQuota}`)
+        } catch (mathErr) {
+            console.error('[ANALYZE_MATH] Falló recálculo de backend:', mathErr)
+            scoreSarc = Number(analysisResult.score || 0)
+        }
 
         console.log(`[ANALYZE] Análisis completado con éxito. Score SARC sugerido: ${scoreSarc}`)
 
