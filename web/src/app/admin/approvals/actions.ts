@@ -174,35 +174,89 @@ export async function analyzeCreditStudyAction(payerId: string) {
             return { error: 'No se pudo obtener la información del pagador.' }
         }
 
-        // 2. Obtener el archivo de la historia de crédito
-        const { data: doc, error: docError } = await supabase
+        // 2. Obtener todos los documentos del pagador
+        const { data: docs, error: docsError } = await supabase
             .from('payer_documents')
             .select('*')
             .eq('payer_id', payerId)
-            .eq('doc_type', 'historia_credito')
-            .single()
 
-        if (docError || !doc) {
+        if (docsError || !docs || docs.length === 0) {
+            return { error: 'No se encontraron documentos cargados para este pagador.' }
+        }
+
+        // Buscar la historia de crédito (obligatoria)
+        const creditHistoryDoc = docs.find(d => d.doc_type === 'historia_credito')
+        if (!creditHistoryDoc) {
             return { error: 'No se encontró una Historia de Crédito cargada para este pagador. Por favor, súbela primero.' }
         }
 
-        // 3. Descargar el archivo desde Supabase Storage
+        // Buscar documentos financieros adicionales
+        const balanceDoc = docs.find(d => d.doc_type === 'balance')
+        const pygDoc = docs.find(d => d.doc_type === 'pyg')
+        const eeffDoc = docs.find(d => d.doc_type === 'estados_financieros')
+
+        // 3. Descargar y parsear la Historia de Crédito (obligatoria)
         const { data: fileData, error: downloadError } = await supabase.storage
             .from('legal-docs')
-            .download(doc.file_path)
+            .download(creditHistoryDoc.file_path)
 
         if (downloadError || !fileData) {
-            console.error('[ANALYZE] Error al descargar archivo:', downloadError)
+            console.error('[ANALYZE] Error al descargar historia de crédito:', downloadError)
             return { error: 'No se pudo descargar el archivo de Historia de Crédito desde el Storage.' }
         }
 
-        // 4. Parsea el texto del PDF
         const arrayBuffer = await fileData.arrayBuffer()
         const buffer = Buffer.from(arrayBuffer)
         const parsedPdf = await pdfParse(buffer)
         const pdfText = parsedPdf.text || ''
+        console.log(`[ANALYZE] Historia de Crédito parseada con éxito. Longitud: ${pdfText.length} caracteres.`)
 
-        console.log(`[ANALYZE] PDF parseado con éxito. Longitud del texto: ${pdfText.length} caracteres.`)
+        // 4. Descargar y parsear documentos financieros de forma segura (opcionales)
+        let balanceText = ''
+        let pygText = ''
+        let eeffText = ''
+
+        if (balanceDoc) {
+            try {
+                const { data: bData } = await supabase.storage.from('legal-docs').download(balanceDoc.file_path)
+                if (bData) {
+                    const bBuffer = Buffer.from(await bData.arrayBuffer())
+                    const bParsed = await pdfParse(bBuffer)
+                    balanceText = bParsed.text || ''
+                    console.log(`[ANALYZE] Balance General parseado con éxito. Longitud: ${balanceText.length} caracteres.`)
+                }
+            } catch (err) {
+                console.error('[ANALYZE] Error parseando Balance:', err)
+            }
+        }
+
+        if (pygDoc) {
+            try {
+                const { data: pData } = await supabase.storage.from('legal-docs').download(pygDoc.file_path)
+                if (pData) {
+                    const pBuffer = Buffer.from(await pData.arrayBuffer())
+                    const pParsed = await pdfParse(pBuffer)
+                    pygText = pParsed.text || ''
+                    console.log(`[ANALYZE] Estado de Resultados (PYG) parseado con éxito. Longitud: ${pygText.length} caracteres.`)
+                }
+            } catch (err) {
+                console.error('[ANALYZE] Error parseando PYG:', err)
+            }
+        }
+
+        if (eeffDoc) {
+            try {
+                const { data: eData } = await supabase.storage.from('legal-docs').download(eeffDoc.file_path)
+                if (eData) {
+                    const eBuffer = Buffer.from(await eData.arrayBuffer())
+                    const eParsed = await pdfParse(eBuffer)
+                    eeffText = eParsed.text || ''
+                    console.log(`[ANALYZE] Estados Financieros completos parseados con éxito. Longitud: ${eeffText.length} caracteres.`)
+                }
+            } catch (err) {
+                console.error('[ANALYZE] Error parseando Estados Financieros:', err)
+            }
+        }
 
         // 5. Configurar llamada a la API de OpenAI
         const openaiApiKey = process.env.OPENAI_API_KEY
@@ -211,36 +265,52 @@ export async function analyzeCreditStudyAction(payerId: string) {
         }
 
         // Construcción del Prompt con la Metodología
-        const promptText = `
-Eres un analista experto de riesgo y crédito de AVALIA. Tu tarea es analizar la historia de crédito adjunta de una Persona Jurídica (PJ) colombiana, complementar con los datos financieros básicos del deudor y retornar un análisis estructurado de scoring según el modelo SARC Wy CF de Avalia.
+        let financialDocsContext = ''
+        if (balanceText) {
+            financialDocsContext += `\nTEXTO DEL BALANCE GENERAL / ESTADO DE SITUACIÓN FINANCIERA DEL DEUDOR:\n"""\n${balanceText.substring(0, 25000)}\n"""\n`
+        }
+        if (pygText) {
+            financialDocsContext += `\nTEXTO DEL ESTADO DE RESULTADOS (PYG) DEL DEUDOR:\n"""\n${pygText.substring(0, 25000)}\n"""\n`
+        }
+        if (eeffText) {
+            financialDocsContext += `\nTEXTO DE ESTADOS FINANCIEROS COMPLETOS DEL DEUDOR:\n"""\n${eeffText.substring(0, 25000)}\n"""\n`
+        }
 
-METODOLOGÍA SARC WY CF Y REGLAS DE CUPO:
+        const promptText = `
+Eres un analista experto de riesgo y crédito de AVALIA. Tu tarea es analizar la historia de crédito adjunta de una Persona Jurídica (PJ) colombiana, complementar con los datos financieros básicos del deudor y los documentos de balance o estados de resultados provistos, y retornar un análisis estructurado de scoring según el modelo SARC Wy CF de Avalia.
+
+METODOLOGÍA SARC WY CF Y REGLAS DE CUPO (APLICACIÓN ESTRICTA):
 1. Ponderación por bloques:
    - Bloque 1 (Variables Financieras y de Riesgo): Peso 35%. Variables:
-     * Disponible vs Capacidad de Pago: >55% (0 pts), 35%-55% (200 pts), 15%-35% (400 pts), 5%-15% (200 pts), <5% (0 pts).
-     * Endeudamiento del Cliente (Pasivo total / (Activo total - Pasivo total)): >60% (0 pts), <=60% (200 pts).
+     * Disponible vs Capacidad de Pago:
+       - Si la Utilidad Operacional del negocio da pérdidas (es negativa), la variable debe calificarse con 0 puntos, sin importar si la utilidad neta contable es positiva por ingresos no recurrentes (ej. dividendos de subsidiarias o resultados no operativos).
+       - En caso de utilidad operacional positiva, calcula el ratio de capacidad y califica: >55% (0 pts), 35%-55% (200 pts), 15%-35% (400 pts), 5%-15% (200 pts), <5% (0 pts).
+     * Endeudamiento del Cliente (Pasivo total / (Activo total - Pasivo total)):
+       - APLICA ESTRICTAMENTE esta fórmula: divide el Pasivo Total entre el Patrimonio (Activo - Pasivo).
+       - Si el resultado es superior al 60% (0.60) (ej. 136.6%), califica con 0 puntos.
+       - Si el resultado es menor o igual al 60% (0.60), califica con 200 puntos.
      * Score PJ Experian:
        - Rango 10 a 600 o Acierta 1,3: -1000 pts.
-         REGLA DE NEUTRALIZACIÓN DE DISASTER SCREENING (CRÍTICA): Si el score Experian está en rango 10-600 pero el comportamiento real detallado en el reporte es sano (moras vigentes en $0, historial intachable, sin reportes negativos activos), la variable Score PJ Experian se neutraliza a 0 en lugar de restar -1000. Se debe justificar detalladamente por escrito.
+         REGLA DE NEUTRALIZACIÓN DE DISASTER SCREENING (CONDICIONADA): Este castigo de -1000 pts se puede neutralizar a 0 puntos ÚNICAMENTE si el comportamiento detallado en el reporte de crédito es 100% sano (moras vigentes en $0, sin reportes negativos activos y sin moras activas recientes). Si el reporte registra moras activas vigentes mayores a $0 (ej. mora de 90+ días) o moras escalando recientes, la neutralización NO APLICA y se debe restar el castigo de -1000 puntos en esta variable.
        - Rango 601 a 700: 200 pts.
        - Mayor a 700: 400 pts.
      * Composición de Deuda Consumo (Deuda Consumo / Deuda Total): <30% (100 pts), >30% (0 pts).
      * Variación de Endeudamiento (último trimestre): Inferior al 20% (100 pts), Superior al 20% (0 pts).
-     * Nota: El Subtotal de Bloque 1 se normaliza sobre un máximo teórico de 1200 puntos a escala 0-1000.
+     * Nota: El Subtotal de Bloque 1 se normaliza sobre un máximo de 1200 puntos a escala 0-1000. Si el score Experian restó -1000 pts, el subtotal de Bloque 1 puede dar negativo; en tal caso, el puntaje normalizado del Bloque 1 es 0.
    - Bloque 2 (Variables Propias del Negocio): Peso 35%. Variables:
      * Antigüedad del negocio: <40 meses (0 pts), 40-59 meses (200 pts), >=60 meses (400 pts).
      * Opera/Administra la empresa: Sí (400 pts), No (0 pts).
      * Crecimiento Ventas últimos 2 años: >5% (400 pts), 1%-5% (200 pts), <=1% o decrece (0 pts).
-     * Nota: El Subtotal de Bloque 2 se normaliza sobre un máximo teórico de 1200 puntos a escala 0-1000.
-   - Bloque 3 (Variables Adicionales PJ): Peso 30%. Variables:
+     * Nota: El Subtotal de Bloque 2 se normaliza sobre un máximo de 1200 puntos a escala 0-1000.
+   - Bloque 3 (Variables Adicionales PJ): Peso 30%. Variables (extrae del Balance, PYG y Estados Financieros provistos):
      * Liquidez - Razón Corriente (Act. Corriente / Pas. Corriente): <1.5 (0 pts), 1.5-2.5 (200 pts), >2.5 (100 pts).
      * Liquidez - Prueba Ácida ((Act. Corriente - Inventarios) / Pas. Corriente): >=1.0 (o cercano a 0.98) (200 pts), otro valor (0 pts).
-     * Endeudamiento - Cobertura de Intereses (EBITDA / Gastos Intereses): >3.0x (200 pts), <=3.0x (0 pts).
+     * Endeudamiento - Cobertura de Intereses (EBITDA / Gastos Intereses): >3.0x (200 pts), <=3.0x (0 pts). (Si la utilidad operacional es negativa, la cobertura es negativa y da 0 pts).
      * Rentabilidad - Margen Neto: Creciente últimos 2 años (200 pts), Estable (100 pts), Decreciente (0 pts).
      * Rentabilidad - ROE (Ut. Neta / Patrimonio): > Costo de oportunidad (200 pts), < Costo de oportunidad (0 pts).
-     * Nota: El Subtotal de Bloque 3 se normaliza sobre un máximo teórico de 1000 puntos a escala 0-1000.
+     * Nota: El Subtotal de Bloque 3 se normaliza sobre un máximo de 1000 puntos a escala 0-1000.
    - Score Final = (Normalizado Bloque 1 * 0.35) + (Normalizado Bloque 2 * 0.35) + (Normalizado Bloque 3 * 0.30).
-   - Umbrales: >=750 (AA - Riesgo muy bajo), 500-749 (A - Riesgo bajo), <500 (No aprueba por modelo).
+   - Umbrales: >=750 (AA - Riesgo muy bajo), 500-749 (A - Riesgo bajo), <500 (No aprueba por modelo - Riesgo Alto).
 
 2. Criterio de Cupo y Plazo (Ancla Principal):
    - Utilidad Neta Mensualizada = Utilidad Neta / 12 meses (o meses del periodo analizado).
@@ -249,6 +319,7 @@ METODOLOGÍA SARC WY CF Y REGLAS DE CUPO:
      * MEDIO: Hasta 1.5x utilidad mensualizada. Plazo max 45 días.
      * MEDIO-ALTO: Hasta 1.0x utilidad mensualizada. Plazo max 30 días.
      * ALTO: No aprobar o máx 0.5x utilidad mensualizada. Plazo max 15 días.
+   - ALERTA DE REESTRUCTURACIÓN / LEY 550 / INSOLVENCIA: Si la empresa se encuentra en Acuerdo de Reestructuración, insolvencia concursal o Ley 550 (lo cual puedes inferir de la razón social, Cámara de Comercio o texto extraído), esto invalida de forma cualitativa la viabilidad de aprobar cupos comerciales y requiere calificar con un score y cupo recomendados de 0, recomendando NO APROBAR.
 
 DATOS FINANCIEROS DEL DEUDOR (REGISTRO EN BD):
 - Razón Social: ${payer.razon_social}
@@ -260,72 +331,74 @@ DATOS FINANCIEROS DEL DEUDOR (REGISTRO EN BD):
 - Compra Mensual estimada por cliente: $${payer.monthly_purchase_value || 0} COP
 - Plazo solicitado por cliente: ${payer.payment_term || 0} días
 
-TEXTO DE LA HISTORIA DE CRÉDITO EXTRAÍDO:
-\"\"\"
-${pdfText.substring(0, 45000)}
-\"\"\"
+${financialDocsContext}
+
+TEXTO DE LA HISTORIA DE CRÉDITO EXTRAÍDO (BURÓ DE RIESGO):
+"""
+${pdfText.substring(0, 35000)}
+"""
 
 INSTRUCCIONES DE RESPUESTA:
-Debes analizar detalladamente el texto de la historia de crédito (Experian/Datacrédito), extraer el Score de Experian (Score PJ), revisar si tiene moras vigentes, reportes negativos de cartera o embargos activos. Calcula todos los ratios financieros y el Score SARC Wy CF basándote en la metodología y las reglas de neutralización de disaster screening.
+Calcula paso a paso todos los indicadores de los 3 bloques basándose en los textos provistos de balance, pyg e historia de crédito. Presta especial atención a si hay moras vigentes (saldo en mora > 0) o moras recurrentes recientes en la historia de crédito, y a si la utilidad operacional es negativa.
 
 Debes responder ÚNICAMENTE con un objeto JSON válido con la siguiente estructura:
 {
-  "score": 730,
-  "category": "A",
+  "score": 131,
+  "category": "No aprueba por modelo",
   "disasterScreening": {
     "applied": true,
-    "neutralized": true,
-    "justification": "Se detectó score Experian de 322. No obstante, el reporte no registra obligaciones en mora vigentes ni reportes negativos. El score bajo refleja utilización de líneas de crédito activas, por lo que se neutraliza a 0 de acuerdo con las políticas de Avalia."
+    "neutralized": false,
+    "justification": "Se detectó score Experian de 286 (rango de castigo). No se aplica la neutralización debido a que el reporte registra obligaciones vigentes en mora (ej. Fiduciaria Bogotá por 90+ días) y un patrón de moras en escala en los últimos meses."
   },
   "blocks": {
     "block1": {
-      "subtotal": 400,
-      "normalized": 333,
+      "subtotal": -800,
+      "normalized": 0,
       "variables": [
-        { "name": "Disponible vs Capacidad de Pago", "value": "12%", "points": 200 },
-        { "name": "Endeudamiento del Cliente", "value": "52%", "points": 200 },
-        { "name": "Score PJ - Experian", "value": "322 (Neutralizado)", "points": 0 },
-        { "name": "Composición de Deuda Consumo", "value": "35%", "points": 0 },
-        { "name": "Variación de Endeudamiento", "value": "25%", "points": 0 }
+        { "name": "Disponible vs Capacidad de Pago", "value": "Operación con pérdida", "points": 0 },
+        { "name": "Endeudamiento del Cliente", "value": "136.6%", "points": 0 },
+        { "name": "Score PJ - Experian", "value": "286", "points": -1000 },
+        { "name": "Composición de Deuda Consumo", "value": "0%", "points": 100 },
+        { "name": "Variación de Endeudamiento", "value": "0%", "points": 100 }
       ]
     },
     "block2": {
-      "subtotal": 800,
-      "normalized": 667,
+      "subtotal": 1000,
+      "normalized": 833,
       "variables": [
-        { "name": "Antigüedad en el negocio", "value": "72 meses", "points": 400 },
+        { "name": "Antigüedad en el negocio", "value": "804 meses", "points": 400 },
         { "name": "Opera/Administra la empresa", "value": "Sí", "points": 400 },
-        { "name": "Crecimiento Ventas - 2 años", "value": "-5%", "points": 0 }
+        { "name": "Crecimiento Ventas - 2 años", "value": "4.9%", "points": 200 }
       ]
     },
     "block3": {
-      "subtotal": 600,
-      "normalized": 600,
+      "subtotal": 0,
+      "normalized": 0,
       "variables": [
-        { "name": "Liquidez – Razón Corriente", "value": "1.8", "points": 200 },
-        { "name": "Liquidez – Prueba Ácida", "value": "0.95", "points": 0 },
-        { "name": "Endeudamiento – Cobertura Intereses", "value": "4.2x", "points": 200 },
-        { "name": "Rentabilidad – Margen Neto", "value": "Estable", "points": 100 },
-        { "name": "Rentabilidad – ROE", "value": "Mayor que costo de oportunidad", "points": 100 }
+        { "name": "Liquidez – Razón Corriente", "value": "0.16", "points": 0 },
+        { "name": "Liquidez – Prueba Ácida", "value": "0.11", "points": 0 },
+        { "name": "Endeudamiento – Cobertura Intereses", "value": "Negativa", "points": 0 },
+        { "name": "Rentabilidad – Margen Neto", "value": "Decreciente", "points": 0 },
+        { "name": "Rentabilidad – ROE", "value": "Menor que costo de oportunidad", "points": 0 }
       ]
     }
   },
   "dimensions": [
-    { "name": "Rentabilidad", "status": "green", "verdict": "Utilidad positiva de $..." },
-    { "name": "Liquidez", "status": "yellow", "verdict": "Razón corriente de 1.8..." },
-    { "name": "Flujo", "status": "green", "verdict": "Ventas mensuales promedio..." },
-    { "name": "Endeudamiento", "status": "yellow", "verdict": "Endeudamiento general de..." },
-    { "name": "Historial Crediticio", "status": "green", "verdict": "Experian 322 neutralizado, comportamiento de pago sano..." },
-    { "name": "Legitimidad", "status": "green", "verdict": "Empresa con más de 6 años..." }
+    { "name": "Rentabilidad", "status": "red", "verdict": "Pérdida operacional de -$5.490 M. Utilidad neta depende de subsidiarias." },
+    { "name": "Liquidez", "status": "red", "verdict": "Razón corriente muy crítica de 0.16 y capital de trabajo negativo." },
+    { "name": "Flujo", "status": "yellow", "verdict": "Ventas mensuales altas, pero financia operación extendiendo proveedores." },
+    { "name": "Endeudamiento", "status": "red", "verdict": "Endeudamiento Wy de 136.6% y cobertura de intereses negativa." },
+    { "name": "Historial Crediticio", "status": "red", "verdict": "Score Experian de 286 con mora vigente activa de 90+ días." },
+    { "name": "Legitimidad", "status": "red", "verdict": "Empresa real y antigua, pero bajo Acuerdo de Reestructuración (Ley 550) ante Supersociedades." }
   ],
   "quota": {
-    "netUtilityMonthly": 30000000,
-    "riskLevel": "medio",
-    "multiplier": 1.5,
-    "recommendedQuota": 45000000,
-    "recommendedTerm": 45
+    "netUtilityMonthly": 96835666,
+    "riskLevel": "alto",
+    "multiplier": 0.0,
+    "recommendedQuota": 0,
+    "recommendedTerm": 0
   },
-  "executiveSummary": "Escribe aquí el resumen cualitativo formal para el comité de riesgos en formato markdown (usando negritas, saltos de línea, etc.) analizando el comportamiento crediticio, capacidad de pago, moras, embargos si los hay, y justificando el cupo y plazo recomendados."
+  "executiveSummary": "Escribe aquí el resumen cualitativo formal para el comité de riesgos en formato markdown (usando negritas, saltos de línea, etc.) analizando la insolvencia jurídica (Ley 550), la pérdida operativa recurrente, la falta crítica de caja (razón corriente de 0.16) y la mora vigente en centrales de riesgo."
 }
 
 No agregues texto introductorio ni explicaciones fuera del JSON. Devuelve únicamente el objeto JSON parseable.
