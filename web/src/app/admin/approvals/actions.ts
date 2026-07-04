@@ -347,6 +347,8 @@ Calcula paso a paso todos los indicadores de los 3 bloques basándose en los tex
 REGLA DE CONCILIACIÓN ARITMÉTICA: Debes asegurarte de que el subtotal de cada bloque sea exactamente la suma matemática de los puntos asignados a sus variables correspondientes. Por ejemplo, en el Bloque 3 si las variables sumaron 200 + 0 + 200 + 200 + 200, el subtotal del Bloque 3 debe ser exactamente 800. Verifica doblemente la suma de cada bloque antes de responder.
 
 Debes responder ÚNICAMENTE con un objeto JSON válido con la siguiente estructura (los valores son ilustrativos y deben ser calculados por ti a partir de los datos reales del deudor):
+
+POLÍTICA ESTRICTA CONTRA LA ALUCINACIÓN Y COPIA DE EJEMPLOS: Los valores de texto, números, porcentajes, meses y puntajes del JSON de abajo son 100% ficticios e ilustrativos. Tienes ESTRICTAMENTE PROHIBIDO copiar los valores literales del ejemplo (como '48 meses', '570', '1.85', '1.05', '12.5%', 200, 400, etc.) en tu respuesta final. Debes evaluar y calcular de forma real y exacta cada propiedad basándote únicamente en el texto del buró de Experian y de los balances/PYG del deudor que se te han suministrado. Explicita en la variable de antigüedad de forma obligatoria los meses calculados a partir de la fecha de constitución (ej. 111 meses).
 {
   "score": 580,
   "category": "A",
