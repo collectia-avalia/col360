@@ -345,64 +345,64 @@ Calcula paso a paso todos los indicadores de los 3 bloques basándose en los tex
 
 REGLA DE CONCILIACIÓN ARITMÉTICA: Debes asegurarte de que el subtotal de cada bloque sea exactamente la suma matemática de los puntos asignados a sus variables correspondientes. Por ejemplo, en el Bloque 3 si las variables sumaron 200 + 0 + 200 + 200 + 200, el subtotal del Bloque 3 debe ser exactamente 800. Verifica doblemente la suma de cada bloque antes de responder.
 
-Debes responder ÚNICAMENTE con un objeto JSON válido con la siguiente estructura:
+Debes responder ÚNICAMENTE con un objeto JSON válido con la siguiente estructura (los valores son ilustrativos y deben ser calculados por ti a partir de los datos reales del deudor):
 {
-  "score": 131,
-  "category": "No aprueba por modelo",
+  "score": 0, // [Coloca aquí el Score total calculado de 10 a 1000 como número entero]
+  "category": "Escribe aquí la categoría de riesgo (ej. 'A', 'AA', o 'No aprueba por modelo')",
   "disasterScreening": {
     "applied": true,
-    "neutralized": false,
-    "justification": "Se detectó score Experian de 286 (rango de castigo). No se aplica la neutralización debido a que el reporte registra obligaciones vigentes en mora (ej. Fiduciaria Bogotá por 90+ días) y un patrón de moras en escala en los últimos meses."
+    "neutralized": false, // [true o false si se neutralizó el score]
+    "justification": "Escribe aquí la justificación de por qué se aplicó y si se neutralizó o no el castigo de Experian"
   },
   "blocks": {
     "block1": {
-      "subtotal": -800,
-      "normalized": 0,
+      "subtotal": 0, // [Suma de puntos crudos del Bloque 1]
+      "normalized": 0, // [Puntaje normalizado del Bloque 1 de 0 a 1000: (subtotal / 1200) * 1000]
       "variables": [
-        { "name": "Disponible vs Capacidad de Pago", "value": "Operación con pérdida", "points": 0 },
-        { "name": "Endeudamiento del Cliente", "value": "136.6%", "points": 0 },
-        { "name": "Score PJ - Experian", "value": "286", "points": -1000 },
-        { "name": "Composición de Deuda Consumo", "value": "0%", "points": 100 },
-        { "name": "Variación de Endeudamiento", "value": "0%", "points": 100 }
+        { "name": "Disponible vs Capacidad de Pago", "value": "Escribe el porcentaje de disponible (Efectivo/Pas.Cte) o 'Operación con pérdida'", "points": 0 },
+        { "name": "Endeudamiento del Cliente", "value": "Escribe el porcentaje de endeudamiento patrimonial Wy", "points": 0 },
+        { "name": "Score PJ - Experian", "value": "Escribe el score de Experian (ej. '551' o '286')", "points": 0 },
+        { "name": "Composición de Deuda Consumo", "value": "Escribe el porcentaje de deuda de consumo", "points": 0 },
+        { "name": "Variación de Endeudamiento", "value": "Escribe el porcentaje de variación trimestral", "points": 0 }
       ]
     },
     "block2": {
-      "subtotal": 1000,
-      "normalized": 833,
+      "subtotal": 0, // [Suma de puntos crudos del Bloque 2]
+      "normalized": 0, // [Puntaje normalizado del Bloque 2 de 0 a 1000: (subtotal / 1200) * 1000]
       "variables": [
-        { "name": "Antigüedad en el negocio", "value": "804 meses", "points": 400 },
-        { "name": "Opera/Administra la empresa", "value": "Sí", "points": 400 },
-        { "name": "Crecimiento Ventas - 2 años", "value": "4.9%", "points": 200 }
+        { "name": "Antigüedad en el negocio", "value": "Escribe la antigüedad en meses (ej. '111 meses')", "points": 0 },
+        { "name": "Opera/Administra la empresa", "value": "Escribe 'Sí' o 'No'", "points": 0 },
+        { "name": "Crecimiento Ventas - 2 años", "value": "Escribe el porcentaje de crecimiento (ej. '-23.9%')", "points": 0 }
       ]
     },
     "block3": {
-      "subtotal": 0,
-      "normalized": 0,
+      "subtotal": 0, // [Suma de puntos crudos del Bloque 3]
+      "normalized": 0, // [Puntaje normalizado del Bloque 3 de 0 a 1000: (subtotal / 1000) * 1000]
       "variables": [
-        { "name": "Liquidez – Razón Corriente", "value": "0.16", "points": 0 },
-        { "name": "Liquidez – Prueba Ácida", "value": "0.11", "points": 0 },
-        { "name": "Endeudamiento – Cobertura Intereses", "value": "Negativa", "points": 0 },
-        { "name": "Rentabilidad – Margen Neto", "value": "Decreciente", "points": 0 },
-        { "name": "Rentabilidad – ROE", "value": "Menor que costo de oportunidad", "points": 0 }
+        { "name": "Liquidez – Razón Corriente", "value": "Escribe el ratio de razón corriente", "points": 0 },
+        { "name": "Liquidez – Prueba Ácida", "value": "Escribe el ratio de prueba ácida", "points": 0 },
+        { "name": "Endeudamiento – Cobertura Intereses", "value": "Escribe el ratio de cobertura (ej. '4.0x')", "points": 0 },
+        { "name": "Rentabilidad – Margen Neto", "value": "Escribe 'Creciente', 'Estable' o 'Decreciente'", "points": 0 },
+        { "name": "Rentabilidad – ROE", "value": "Escribe 'Mayor que costo de oportunidad' o 'Menor que costo de oportunidad'", "points": 0 }
       ]
     }
   },
   "dimensions": [
-    { "name": "Rentabilidad", "status": "red", "verdict": "Pérdida operacional de -$5.490 M. Utilidad neta depende de subsidiarias." },
-    { "name": "Liquidez", "status": "red", "verdict": "Razón corriente muy crítica de 0.16 y capital de trabajo negativo." },
-    { "name": "Flujo", "status": "yellow", "verdict": "Ventas mensuales altas, pero financia operación extendiendo proveedores." },
-    { "name": "Endeudamiento", "status": "red", "verdict": "Endeudamiento Wy de 136.6% y cobertura de intereses negativa." },
-    { "name": "Historial Crediticio", "status": "red", "verdict": "Score Experian de 286 con mora vigente activa de 90+ días." },
-    { "name": "Legitimidad", "status": "red", "verdict": "Empresa real y antigua, pero bajo Acuerdo de Reestructuración (Ley 550) ante Supersociedades." }
+    { "name": "Rentabilidad", "status": "Escribe 'green', 'yellow' o 'red'", "verdict": "Escribe el veredicto cualitativo breve de rentabilidad" },
+    { "name": "Liquidez", "status": "Escribe 'green', 'yellow' o 'red'", "verdict": "Escribe el veredicto cualitativo breve de liquidez" },
+    { "name": "Flujo", "status": "Escribe 'green', 'yellow' o 'red'", "verdict": "Escribe el veredicto cualitativo de flujo" },
+    { "name": "Endeudamiento", "status": "Escribe 'green', 'yellow' o 'red'", "verdict": "Escribe el veredicto de endeudamiento" },
+    { "name": "Historial Crediticio", "status": "Escribe 'green', 'yellow' o 'red'", "verdict": "Escribe el veredicto de centrales" },
+    { "name": "Legitimidad", "status": "Escribe 'green', 'yellow' o 'red'", "verdict": "Escribe el veredicto de legitimidad y legalidad" }
   ],
   "quota": {
-    "netUtilityMonthly": 96835666,
-    "riskLevel": "alto",
-    "multiplier": 0.0,
-    "recommendedQuota": 0,
-    "recommendedTerm": 0
+    "netUtilityMonthly": 0, // [Utilidad Neta del periodo analizado dividida entre 12 meses como número entero]
+    "riskLevel": "Escribe 'bajo', 'medio', 'medio-alto' o 'alto'",
+    "multiplier": 0.0, // [Multiplicador a aplicar: 2.0 para bajo, 1.5 para medio, 1.0 para medio-alto, 0.5 o 0 para alto]
+    "recommendedQuota": 0, // [netUtilityMonthly * multiplier redondeado a número entero]
+    "recommendedTerm": 0 // [60 para bajo, 45 para medio, 30 para medio-alto, 15 o 0 para alto]
   },
-  "executiveSummary": "Escribe aquí el resumen cualitativo formal para el comité de riesgos en formato markdown (usando negritas, saltos de línea, etc.) analizando la insolvencia jurídica (Ley 550), la pérdida operativa recurrente, la falta crítica de caja (razón corriente de 0.16) y la mora vigente en centrales de riesgo."
+  "executiveSummary": "Escribe aquí el resumen cualitativo formal para el comité de riesgos en formato markdown (usando negritas, saltos de línea, etc.) analizando detalladamente los puntos fuertes y de cautela del deudor, y justificando el cupo y plazo recomendados."
 }
 
 No agregues texto introductorio ni explicaciones fuera del JSON. Devuelve únicamente el objeto JSON parseable.
