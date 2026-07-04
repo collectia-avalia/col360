@@ -306,12 +306,12 @@ export default function CreditStudyPanel({
             </div>
 
             {/* KPI Cupo Sugerido */}
-            <div className="border border-slate-200 rounded-xl p-4 bg-indigo-50/30 flex flex-col justify-between">
+            <div className="border border-slate-200 rounded-xl p-4 bg-indigo-50/30 flex flex-col justify-between overflow-hidden">
               <div>
                 <p className="text-xs font-bold text-indigo-500 uppercase tracking-widest flex items-center gap-1">
                   <DollarSign className="w-3.5 h-3.5" /> Cupo Recomendado
                 </p>
-                <p className="text-2xl font-black text-indigo-950 mt-1">
+                <p className="text-lg sm:text-xl lg:text-2xl font-black text-indigo-950 mt-1 break-words leading-tight">
                   {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(studyResult.quota.recommendedQuota)}
                 </p>
               </div>
@@ -321,12 +321,12 @@ export default function CreditStudyPanel({
             </div>
 
             {/* KPI Ancla Financiera */}
-            <div className="border border-slate-200 rounded-xl p-4 bg-slate-50 flex flex-col justify-between">
+            <div className="border border-slate-200 rounded-xl p-4 bg-slate-50 flex flex-col justify-between overflow-hidden">
               <div>
                 <p className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1">
                   Utilidad Neta Mensual
                 </p>
-                <p className="text-xl font-bold text-slate-800 mt-1">
+                <p className="text-base sm:text-lg lg:text-xl font-bold text-slate-800 mt-1 break-words leading-tight">
                   {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(studyResult.quota.netUtilityMonthly)}
                 </p>
               </div>
