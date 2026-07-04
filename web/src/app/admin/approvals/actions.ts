@@ -348,60 +348,60 @@ REGLA DE CONCILIACIÓN ARITMÉTICA: Debes asegurarte de que el subtotal de cada 
 
 Debes responder ÚNICAMENTE con un objeto JSON válido con la siguiente estructura (los valores son ilustrativos y deben ser calculados por ti a partir de los datos reales del deudor):
 {
-  "score": 0, // [Coloca aquí el Score total calculado de 10 a 1000 como número entero]
-  "category": "Escribe aquí la categoría de riesgo (ej. 'A', 'AA', o 'No aprueba por modelo')",
+  "score": 580,
+  "category": "A",
   "disasterScreening": {
     "applied": true,
-    "neutralized": false, // [true o false si se neutralizó el score]
-    "justification": "Escribe aquí la justificación de por qué se aplicó y si se neutralizó o no el castigo de Experian"
+    "neutralized": true,
+    "justification": "Se detectó score Experian de 570 (rango de castigo). Se aplica la neutralización a 0 debido a comportamiento de pago 100% sano en centrales de riesgo."
   },
   "blocks": {
     "block1": {
-      "subtotal": 0, // [Suma de puntos crudos del Bloque 1]
-      "normalized": 0, // [Puntaje normalizado del Bloque 1 de 0 a 1000: (subtotal / 1200) * 1000]
+      "subtotal": 400,
+      "normalized": 333,
       "variables": [
-        { "name": "Disponible vs Capacidad de Pago", "value": "Escribe el porcentaje de disponible (Efectivo/Pas.Cte) o 'Operación con pérdida'", "points": 0 },
-        { "name": "Endeudamiento del Cliente", "value": "Escribe el porcentaje de endeudamiento patrimonial Wy", "points": 0 },
-        { "name": "Score PJ - Experian", "value": "Escribe el score de Experian (ej. '551' o '286')", "points": 0 },
-        { "name": "Composición de Deuda Consumo", "value": "Escribe el porcentaje de deuda de consumo", "points": 0 },
-        { "name": "Variación de Endeudamiento", "value": "Escribe el porcentaje de variación trimestral", "points": 0 }
+        { "name": "Disponible vs Capacidad de Pago", "value": "12.5%", "points": 200 },
+        { "name": "Endeudamiento del Cliente", "value": "45.0%", "points": 200 },
+        { "name": "Score PJ - Experian", "value": "570", "points": 0 },
+        { "name": "Composición de Deuda Consumo", "value": "15.0%", "points": 100 },
+        { "name": "Variación de Endeudamiento", "value": "8.0%", "points": 100 }
       ]
     },
     "block2": {
-      "subtotal": 0, // [Suma de puntos crudos del Bloque 2]
-      "normalized": 0, // [Puntaje normalizado del Bloque 2 de 0 a 1000: (subtotal / 1200) * 1000]
+      "subtotal": 800,
+      "normalized": 667,
       "variables": [
-        { "name": "Antigüedad en el negocio", "value": "Escribe la antigüedad en meses (ej. '111 meses')", "points": 0 },
-        { "name": "Opera/Administra la empresa", "value": "Escribe 'Sí' o 'No'", "points": 0 },
-        { "name": "Crecimiento Ventas - 2 años", "value": "Escribe el porcentaje de crecimiento (ej. '-23.9%')", "points": 0 }
+        { "name": "Antigüedad en el negocio", "value": "48 meses", "points": 200 },
+        { "name": "Opera/Administra la empresa", "value": "Sí", "points": 400 },
+        { "name": "Crecimiento Ventas - 2 años", "value": "12.0%", "points": 200 }
       ]
     },
     "block3": {
-      "subtotal": 0, // [Suma de puntos crudos del Bloque 3]
-      "normalized": 0, // [Puntaje normalizado del Bloque 3 de 0 a 1000: (subtotal / 1000) * 1000]
+      "subtotal": 600,
+      "normalized": 600,
       "variables": [
-        { "name": "Liquidez – Razón Corriente", "value": "Escribe el ratio de razón corriente", "points": 0 },
-        { "name": "Liquidez – Prueba Ácida", "value": "Escribe el ratio de prueba ácida", "points": 0 },
-        { "name": "Endeudamiento – Cobertura Intereses", "value": "Escribe el ratio de cobertura (ej. '4.0x')", "points": 0 },
-        { "name": "Rentabilidad – Margen Neto", "value": "Escribe 'Creciente', 'Estable' o 'Decreciente'", "points": 0 },
-        { "name": "Rentabilidad – ROE", "value": "Escribe 'Mayor que costo de oportunidad' o 'Menor que costo de oportunidad'", "points": 0 }
+        { "name": "Liquidez – Razón Corriente", "value": "1.85", "points": 200 },
+        { "name": "Liquidez – Prueba Ácida", "value": "1.05", "points": 200 },
+        { "name": "Endeudamiento – Cobertura Intereses", "value": "1.5x", "points": 0 },
+        { "name": "Rentabilidad – Margen Neto", "value": "Creciente", "points": 200 },
+        { "name": "Rentabilidad – ROE", "value": "Menor que costo de oportunidad", "points": 0 }
       ]
     }
   },
   "dimensions": [
-    { "name": "Rentabilidad", "status": "Escribe 'green', 'yellow' o 'red'", "verdict": "Escribe el veredicto cualitativo breve de rentabilidad" },
-    { "name": "Liquidez", "status": "Escribe 'green', 'yellow' o 'red'", "verdict": "Escribe el veredicto cualitativo breve de liquidez" },
-    { "name": "Flujo", "status": "Escribe 'green', 'yellow' o 'red'", "verdict": "Escribe el veredicto cualitativo de flujo" },
-    { "name": "Endeudamiento", "status": "Escribe 'green', 'yellow' o 'red'", "verdict": "Escribe el veredicto de endeudamiento" },
-    { "name": "Historial Crediticio", "status": "Escribe 'green', 'yellow' o 'red'", "verdict": "Escribe el veredicto de centrales" },
-    { "name": "Legitimidad", "status": "Escribe 'green', 'yellow' o 'red'", "verdict": "Escribe el veredicto de legitimidad y legalidad" }
+    { "name": "Rentabilidad", "status": "yellow", "verdict": "Margen neto creciente pero ROE por debajo del costo de oportunidad." },
+    { "name": "Liquidez", "status": "green", "verdict": "Razón corriente de 1.85 y prueba ácida sana de 1.05." },
+    { "name": "Flujo", "status": "green", "verdict": "Ventas estables y recaudo de cartera controlado." },
+    { "name": "Endeudamiento", "status": "yellow", "verdict": "Endeudamiento patrimonial moderado pero cobertura de intereses débil." },
+    { "name": "Historial Crediticio", "status": "green", "verdict": "Score neutralizado, excelente comportamiento de pago sin moras." },
+    { "name": "Legitimidad", "status": "green", "verdict": "Empresa real con documentación y constitución verificadas." }
   ],
   "quota": {
-    "netUtilityMonthly": 0, // [Utilidad Neta del periodo analizado dividida entre 12 meses como número entero]
-    "riskLevel": "Escribe 'bajo', 'medio', 'medio-alto' o 'alto'",
-    "multiplier": 0.0, // [Multiplicador a aplicar: 2.0 para bajo, 1.5 para medio, 1.0 para medio-alto, 0.5 o 0 para alto]
-    "recommendedQuota": 0, // [netUtilityMonthly * multiplier redondeado a número entero]
-    "recommendedTerm": 0 // [60 para bajo, 45 para medio, 30 para medio-alto, 15 o 0 para alto]
+    "netUtilityMonthly": 12500000,
+    "riskLevel": "medio",
+    "multiplier": 1.5,
+    "recommendedQuota": 18750000,
+    "recommendedTerm": 45
   },
   "executiveSummary": "Escribe aquí el resumen cualitativo formal para el comité de riesgos en formato markdown (usando negritas, saltos de línea, etc.) analizando detalladamente los puntos fuertes y de cautela del deudor, y justificando el cupo y plazo recomendados."
 }
