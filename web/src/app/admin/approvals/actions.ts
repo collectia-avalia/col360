@@ -282,18 +282,20 @@ Eres un analista experto de riesgo y crédito de AVALIA. Tu tarea es analizar la
 METODOLOGÍA SARC WY CF Y REGLAS DE CUPO (APLICACIÓN ESTRICTA):
 1. Ponderación por bloques:
    - Bloque 1 (Variables Financieras y de Riesgo): Peso 35%. Variables:
-     * Disponible vs Capacidad de Pago:
-       - Si la Utilidad Operacional del negocio da pérdidas (es negativa), la variable debe calificarse con 0 puntos, sin importar si la utilidad neta contable es positiva por ingresos no recurrentes (ej. dividendos de subsidiarias o resultados no operativos).
-       - En caso de utilidad operacional positiva, calcula el ratio de capacidad y califica: >55% (0 pts), 35%-55% (200 pts), 15%-35% (400 pts), 5%-15% (200 pts), <5% (0 pts).
+     * Disponible vs Capacidad de Pago (Efectivo y Equivalentes / Pasivo Corriente):
+       - APLICA ESTRICTAMENTE esta fórmula: divide el Efectivo y Equivalentes de la caja del balance entre el Pasivo Corriente. No uses el margen neto ni el margen operacional.
+       - Si el texto del balance no contiene o no se puede determinar de forma clara y explícita el Efectivo y Equivalentes o el Pasivo Corriente, califica la variable Disponible vs Capacidad de Pago con 0 puntos. Nunca uses el margen operacional o neto como fallback.
+       - Si la Utilidad Operacional del negocio da pérdidas (es negativa), la variable debe calificarse con 0 puntos de inmediato.
+       - En caso de utilidad operacional positiva, calcula el ratio de capacidad (Efectivo / Pasivo Corriente) y califica: >55% (0 pts), 35%-55% (200 pts), 15%-35% (400 pts), 5%-15% (200 pts), <5% (0 pts).
      * Endeudamiento del Cliente (Pasivo total / (Activo total - Pasivo total)):
        - APLICA ESTRICTAMENTE esta fórmula: divide el Pasivo Total entre el Patrimonio (Activo - Pasivo).
        - Si el resultado es superior al 60% (0.60) (ej. 136.6%), califica con 0 puntos.
        - Si el resultado es menor o igual al 60% (0.60), califica con 200 puntos.
      * Score PJ Experian:
-       - Rango 10 a 600 o Acierta 1,3: -1000 pts.
-         REGLA DE NEUTRALIZACIÓN DE DISASTER SCREENING (CONDICIONADA): Este castigo de -1000 pts se puede neutralizar a 0 puntos ÚNICAMENTE si el comportamiento detallado en el reporte de crédito es 100% sano (moras vigentes en $0, sin reportes negativos activos y sin moras activas recientes). Si el reporte registra moras activas vigentes mayores a $0 (ej. mora de 90+ días) o moras escalando recientes, la neutralización NO APLICA y se debe restar el castigo de -1000 puntos en esta variable.
-       - Rango 601 a 700: 200 pts.
-       - Mayor a 700: 400 pts.
+       - Si el score Experian está en el rango de 10 a 600: Asigna base de -1000 pts.
+         REGLA DE NEUTRALIZACIÓN (CONVERTIR A EXACTAMENTE 0 PTS): Este castigo de -1000 pts se puede neutralizar a EXACTAMENTE 0 puntos (bajo ninguna circunstancia asignes valores positivos como 200 o 400 si el score original está entre 10 y 600, incluso si se neutraliza) ÚNICAMENTE si el comportamiento de pago en la historia de crédito es 100% sano (moras vigentes en $0 COP y sin moras recientes). Si el reporte muestra moras vigentes mayores a $0 COP (como moras de 30, 60 o 90+ días) o moras recurrentes recientes, la neutralización NO APLICA y los puntos para esta variable deben ser exactamente -1000 pts.
+       - Si el score Experian está en el rango de 601 a 700: Asigna exactamente 200 pts.
+       - Si el score Experian es mayor a 700: Asigna exactamente 400 pts.
      * Composición de Deuda Consumo (Deuda Consumo / Deuda Total): <30% (100 pts), >30% (0 pts).
      * Variación de Endeudamiento (último trimestre): Inferior al 20% (100 pts), Superior al 20% (0 pts).
      * Nota: El Subtotal de Bloque 1 se normaliza sobre un máximo de 1200 puntos a escala 0-1000. Si el score Experian restó -1000 pts, el subtotal de Bloque 1 puede dar negativo; en tal caso, el puntaje normalizado del Bloque 1 es 0.
@@ -340,6 +342,8 @@ ${pdfText.substring(0, 35000)}
 
 INSTRUCCIONES DE RESPUESTA:
 Calcula paso a paso todos los indicadores de los 3 bloques basándose en los textos provistos de balance, pyg e historia de crédito. Presta especial atención a si hay moras vigentes (saldo en mora > 0) o moras recurrentes recientes en la historia de crédito, y a si la utilidad operacional es negativa.
+
+REGLA DE CONCILIACIÓN ARITMÉTICA: Debes asegurarte de que el subtotal de cada bloque sea exactamente la suma matemática de los puntos asignados a sus variables correspondientes. Por ejemplo, en el Bloque 3 si las variables sumaron 200 + 0 + 200 + 200 + 200, el subtotal del Bloque 3 debe ser exactamente 800. Verifica doblemente la suma de cada bloque antes de responder.
 
 Debes responder ÚNICAMENTE con un objeto JSON válido con la siguiente estructura:
 {
