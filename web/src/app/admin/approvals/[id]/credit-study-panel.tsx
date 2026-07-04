@@ -293,7 +293,7 @@ export default function CreditStudyPanel({
             <div className="border border-slate-200 rounded-xl p-3 sm:p-4 bg-slate-50 flex flex-col justify-between overflow-hidden">
               <div>
                 <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Score SARC PJ</p>
-                <p className="text-2xl sm:text-3xl font-black text-slate-900 mt-1 whitespace-nowrap">{studyResult.score}/1.000</p>
+                <p className="text-sm sm:text-base md:text-[11px] lg:text-sm xl:text-xl font-black text-slate-900 mt-1 whitespace-nowrap leading-tight">{studyResult.score}/1.000</p>
               </div>
               <div className="mt-4">
                 <span className={`px-2.5 py-1 text-xs font-bold rounded-full border
@@ -311,7 +311,7 @@ export default function CreditStudyPanel({
                 <p className="text-xs font-bold text-indigo-500 uppercase tracking-widest flex items-center gap-1">
                   <DollarSign className="w-3.5 h-3.5" /> Cupo Recomendado
                 </p>
-                <p className="text-lg sm:text-xl md:text-sm lg:text-lg xl:text-2xl font-black text-indigo-950 mt-1 whitespace-nowrap leading-tight">
+                <p className="text-sm sm:text-base md:text-[11px] lg:text-sm xl:text-xl font-black text-indigo-950 mt-1 whitespace-nowrap leading-tight">
                   {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(studyResult.quota.recommendedQuota)}
                 </p>
               </div>
