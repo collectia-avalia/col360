@@ -105,6 +105,7 @@ export default async function ApprovalDetailPage({
               payerName={payer.razon_social}
               historyDoc={historyDoc}
               studyResult={payer.credit_study_result}
+              studyPaymentStatus={payer.study_payment_status}
             />
             
             {/* Tarjeta Info Pagador */}

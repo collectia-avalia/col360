@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { CheckCircle, Search, Wallet, AlertCircle, TrendingUp, Clock } from 'lucide-react'
+import { CheckCircle, Search, Wallet, AlertCircle, TrendingUp, Clock, Mail, Sparkles } from 'lucide-react'
 import { toggleInvoiceStatus } from './actions'
 import { ExportButton } from '@/components/ui/ExportButton'
 
@@ -19,7 +19,17 @@ interface Invoice {
   }
 }
 
-export function InvoicesList({ invoices, initialFilterStatus, role }: { invoices: Invoice[], initialFilterStatus: string, role?: string }) {
+export function InvoicesList({ 
+  invoices, 
+  initialFilterStatus, 
+  role,
+  subscriptionStatus = 'none' 
+}: { 
+  invoices: Invoice[]
+  initialFilterStatus: string
+  role?: string
+  subscriptionStatus?: string 
+}) {
   const [filterStatus, setFilterStatus] = useState(initialFilterStatus || 'todos')
   const [filterGuarantee, setFilterGuarantee] = useState('todos')
   const [searchTerm, setSearchTerm] = useState('')
@@ -154,6 +164,34 @@ export function InvoicesList({ invoices, initialFilterStatus, role }: { invoices
 
   return (
     <div className="space-y-6">
+      
+      {/* Banner Promocional de Cobros Automáticos (Solo si no tiene suscripción activa y no es deudor) */}
+      {subscriptionStatus !== 'active' && role !== 'payer_guest' && (
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-indigo-950 via-avalia-petrol to-indigo-900 text-white p-6 shadow-sm border border-slate-800">
+          <div className="absolute top-0 right-0 w-[30%] h-full opacity-10 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-white via-indigo-500 to-transparent pointer-events-none" />
+          <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <span className="inline-flex items-center px-2 py-0.5 text-[9px] font-black bg-indigo-500 text-white rounded-full uppercase tracking-wider gap-1">
+                  <Sparkles className="w-2.5 h-2.5" /> Premium
+                </span>
+                <span className="text-xs font-bold text-indigo-400">Servicio de Mensajería</span>
+              </div>
+              <h3 className="text-base md:text-lg font-black leading-tight">Automatiza tus Cobros y Reduce la Cartera Vencida</h3>
+              <p className="text-xs text-slate-300 max-w-2xl leading-relaxed">
+                Activa el envío diario automático de correos de cobro y recordatorios a tus deudores en mora (días 1, 5, 10, 15 y 30). Deja que Avalia cobre por ti.
+              </p>
+            </div>
+            <Link 
+              href="/dashboard/subscription"
+              className="shrink-0 inline-flex items-center justify-center px-4 py-2.5 bg-white hover:bg-slate-50 text-indigo-950 text-xs font-bold rounded-lg transition-all transform hover:scale-[1.02] active:scale-[0.98] shadow-sm gap-1.5"
+            >
+              <Mail className="w-3.5 h-3.5 text-indigo-600" />
+              Activar Cobro Automático
+            </Link>
+          </div>
+        </div>
+      )}
       
       {/* KPI Cards Mini Dashboard */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">

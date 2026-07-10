@@ -52,12 +52,14 @@ export default function CreditStudyPanel({
   payerId, 
   payerName,
   historyDoc,
-  studyResult 
+  studyResult,
+  studyPaymentStatus = 'none'
 }: { 
   payerId: string
   payerName: string
   historyDoc?: any
   studyResult?: CreditStudyResult | null
+  studyPaymentStatus?: string
 }) {
   const router = useRouter()
   const [isUploading, startUploadTransition] = useTransition()
@@ -181,13 +183,20 @@ export default function CreditStudyPanel({
           <p className="text-xs text-slate-500 mt-1">Análisis e informe de riesgo bajo el modelo SARC Wy CF</p>
         </div>
         {historyDoc && !studyResult && !isAnalyzing && (
-          <button
-            onClick={handleAnalyze}
-            className="inline-flex items-center px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg shadow-sm transition-colors gap-1.5"
-          >
-            <Play className="w-3.5 h-3.5" />
-            Analizar con IA
-          </button>
+          studyPaymentStatus === 'pending' ? (
+            <span className="inline-flex items-center px-3 py-1.5 bg-amber-50 border border-amber-200 text-amber-700 text-xs font-bold rounded-lg shadow-sm gap-1.5">
+              <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
+              Esperando Pago
+            </span>
+          ) : (
+            <button
+              onClick={handleAnalyze}
+              className="inline-flex items-center px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg shadow-sm transition-colors gap-1.5"
+            >
+              <Play className="w-3.5 h-3.5" />
+              Analizar con IA
+            </button>
+          )
         )}
       </div>
 
@@ -258,20 +267,33 @@ export default function CreditStudyPanel({
               </p>
             </div>
           ) : (
-            <div className="text-center py-6 border border-slate-100 rounded-xl bg-slate-50/50">
-              <Sparkles className="w-8 h-8 text-indigo-400 mx-auto mb-2 animate-bounce" />
-              <h3 className="text-sm font-bold text-slate-800">Scoring SARC Wy CF Disponible</h3>
-              <p className="text-xs text-slate-500 max-w-xs mx-auto mt-1 mb-4">
-                Ejecuta el análisis con IA para calcular automáticamente los bloques de scoring y obtener sugerencias de cupo.
-              </p>
-              <button
-                onClick={handleAnalyze}
-                className="inline-flex items-center px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-lg shadow-md transition-colors gap-2"
-              >
-                <Sparkles className="w-4 h-4" />
-                Ejecutar Análisis
-              </button>
-            </div>
+            studyPaymentStatus === 'pending' ? (
+              <div className="text-center py-8 border border-amber-100 rounded-xl bg-amber-50/10 space-y-3">
+                <AlertTriangle className="w-10 h-10 text-amber-500 mx-auto mb-2 animate-pulse" />
+                <h3 className="text-sm font-bold text-amber-900">Estudio Pendiente de Pago</h3>
+                <p className="text-xs text-amber-700 max-w-sm mx-auto leading-relaxed">
+                  El deudor ha completado el formulario de debida diligencia, pero para poder ejecutar el análisis automático SARC por IA, el cliente debe pagar el costo de $45.000 COP desde su panel.
+                </p>
+                <div className="inline-flex items-center px-3 py-1 bg-amber-100 text-amber-800 text-xs font-bold rounded-full">
+                  Esperando pago de $45.000 COP
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-6 border border-slate-100 rounded-xl bg-slate-50/50">
+                <Sparkles className="w-8 h-8 text-indigo-400 mx-auto mb-2 animate-bounce" />
+                <h3 className="text-sm font-bold text-slate-800">Scoring SARC Wy CF Disponible</h3>
+                <p className="text-xs text-slate-500 max-w-xs mx-auto mt-1 mb-4">
+                  Ejecuta el análisis con IA para calcular automáticamente los bloques de scoring y obtener sugerencias de cupo.
+                </p>
+                <button
+                  onClick={handleAnalyze}
+                  className="inline-flex items-center px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-lg shadow-md transition-colors gap-2"
+                >
+                  <Sparkles className="w-4 h-4" />
+                  Ejecutar Análisis
+                </button>
+              </div>
+            )
           )}
 
           {analyzeError && (
@@ -466,7 +488,7 @@ export default function CreditStudyPanel({
 
             <button
               onClick={handleAnalyze}
-              disabled={isAnalyzing}
+              disabled={isAnalyzing || studyPaymentStatus === 'pending'}
               className="inline-flex items-center justify-center px-4 py-2.5 border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 hover:text-slate-800 text-sm font-bold rounded-lg shadow-xs transition-all gap-1.5 disabled:opacity-50"
             >
               <RefreshCw className={`w-4 h-4 ${isAnalyzing ? 'animate-spin' : ''}`} />

@@ -198,10 +198,10 @@ export async function submitCreditStudyByTokenAction(formData: FormData) {
 
     const supabaseAdmin = createAdminClient()
 
-    // 1. Validar token y obtener pagador
+    // 1. Validar token y obtener pagador con relación al perfil del creador
     const { data: payer, error: findError } = await supabaseAdmin
         .from('payers')
-        .select('id')
+        .select('id, razon_social, created_by, profiles:created_by(email, company_name)')
         .eq('invitation_token', token)
         .single()
 
@@ -210,7 +210,43 @@ export async function submitCreditStudyByTokenAction(formData: FormData) {
         return { error: 'Token invalido o expirado' }
     }
 
-    // 2. Actualizar datos financieros y legales
+    // 2. Generar sesión de Stripe Checkout de forma defensiva ($45.000 COP)
+    let stripeSessionUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard/payers/${payer.id}`
+    let stripeSessionId = 'simulated_session_id'
+
+    try {
+        if (process.env.STRIPE_SECRET_KEY) {
+            const { stripe } = require('@/lib/stripe')
+            const session = await stripe.checkout.sessions.create({
+                payment_method_types: ['card'],
+                line_items: [
+                    {
+                        price_data: {
+                            currency: 'cop',
+                            product_data: {
+                                name: `Estudio de Crédito Comercial SARC - ${payer.razon_social}`,
+                                description: 'Análisis automatizado cuantitativo, cualitativo y de centrales de riesgo por Inteligencia Artificial (SARC Wy CF).',
+                            },
+                            unit_amount: 4500000, // $45.000 COP en centavos
+                        },
+                        quantity: 1,
+                    },
+                ],
+                mode: 'payment',
+                success_url: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard/payers/${payer.id}?payment=success`,
+                cancel_url: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard/payers/${payer.id}?payment=cancel`,
+                client_reference_id: payer.id,
+            })
+            if (session.url) stripeSessionUrl = session.url
+            if (session.id) stripeSessionId = session.id
+        } else {
+            console.warn('[STRIPE] STRIPE_SECRET_KEY no está configurada en entorno. Utilizando sesión simulada.')
+        }
+    } catch (err: any) {
+        console.error('[STRIPE] Error al crear sesión de Checkout:', err.message || err)
+    }
+
+    // 3. Actualizar datos financieros, estado del estudio a 'pending' y el ID de sesión de Stripe
     const updateData: Record<string, unknown> = {
         commercial_address: formData.get('commercial_address') as string,
         legal_representative: formData.get('legal_representative') as string,
@@ -218,11 +254,12 @@ export async function submitCreditStudyByTokenAction(formData: FormData) {
         total_assets: Number(formData.get('total_assets')) || 0,
         total_liabilities: Number(formData.get('total_liabilities')) || 0,
         net_utility: Number(formData.get('net_utility')) || 0,
-        invitation_status: 'completed'
+        invitation_status: 'completed',
+        study_payment_status: 'pending',
+        stripe_session_id: stripeSessionId
     }
 
-    console.log('[FormularioAction] Datos a guardar:', updateData)
-    console.log('[FormularioAction] Payer ID:', payer.id)
+    console.log('[FormularioAction] Guardando datos financieros y de Stripe para payer ID:', payer.id)
 
     const { error: updateError } = await supabaseAdmin
         .from('payers')
@@ -232,6 +269,38 @@ export async function submitCreditStudyByTokenAction(formData: FormData) {
     if (updateError) {
         console.error('Error actualizando pagador:', updateError)
         return { error: 'Error al guardar los datos financieros' }
+    }
+
+    // 4. Enviar notificación por correo al cliente de Avalia con el link de pago
+    try {
+        const creatorEmail = (payer.profiles as any)?.email
+        const creatorCompanyName = (payer.profiles as any)?.company_name || 'Cliente'
+
+        if (creatorEmail) {
+            console.log(`[FormularioAction] Enviando correo de cobro a ${creatorEmail} para el pagador ${payer.razon_social}`)
+            await sendEmail({
+                to: creatorEmail,
+                subject: `Estudio de crédito listo para pago: ${payer.razon_social} - Avalia`,
+                html: `
+                    <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 25px; border: 1px solid #e2e8f0; border-radius: 16px; background-color: #ffffff;">
+                        <h2 style="color: #6366f1; text-align: center; margin-bottom: 20px; font-weight: 800;">Estudio de Crédito Listo</h2>
+                        <p style="color: #334155; font-size: 15px; line-height: 1.6;">Hola <strong>${creatorCompanyName}</strong>,</p>
+                        <p style="color: #334155; font-size: 15px; line-height: 1.6;">Tu cliente <strong>${payer.razon_social}</strong> ha terminado de diligenciar su formulario y cargar sus estados financieros.</p>
+                        <p style="color: #334155; font-size: 15px; line-height: 1.6;">Para activar el análisis inteligente bajo el modelo <strong>SARC Wy CF</strong> y ver las recomendaciones de cupo, debes realizar el pago del estudio por valor de <strong>$45.000 COP</strong>.</p>
+                        <div style="text-align: center; margin: 35px 0;">
+                            <a href="${stripeSessionUrl}" target="_blank" style="background-color: #6366f1; color: #ffffff; padding: 14px 28px; text-decoration: none; font-weight: bold; border-radius: 8px; box-shadow: 0 4px 10px rgba(99, 102, 241, 0.2); display: inline-block;">Pagar Estudio de Crédito ($45.000)</a>
+                        </div>
+                        <p style="color: #64748b; font-size: 12px; text-align: center;">Si tienes problemas con el botón, copia y pega el siguiente enlace:<br><a href="${stripeSessionUrl}" style="color: #6366f1;">${stripeSessionUrl}</a></p>
+                        <hr style="border: 0; border-top: 1px solid #f1f5f9; margin: 25px 0;" />
+                        <p style="color: #94a3b8; font-size: 11px; text-align: center;">Mensaje automático enviado por Avalia SaaS. Todos los derechos reservados.</p>
+                    </div>
+                `
+            })
+        } else {
+            console.warn('[FormularioAction] No se encontró correo de creador para notificar el estudio de', payer.razon_social)
+        }
+    } catch (emailErr: any) {
+        console.error('[FormularioAction] Error enviando correo de cobro:', emailErr.message || emailErr)
     }
 
     // 3. Procesar Archivos

@@ -73,7 +73,12 @@ export default async function InvoicesPage({
         )}
       </div>
 
-      <InvoicesList invoices={invoices || []} initialFilterStatus={initialFilterStatus} role={profile?.role} />
+      <InvoicesList 
+        invoices={invoices || []} 
+        initialFilterStatus={initialFilterStatus} 
+        role={profile?.role} 
+        subscriptionStatus={profile?.subscription_status} 
+      />
     </div>
   )
 }

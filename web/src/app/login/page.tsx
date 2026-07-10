@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { login } from '../auth/actions'
 import { AvaliaLogo } from '@/components/ui/Logo'
 import { Copyright } from '@/components/ui/Copyright'
@@ -11,6 +11,14 @@ import Link from 'next/link'
 export default function LoginPage() {
   const [isCaptchaVerified, setIsCaptchaVerified] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [isSignupSuccess, setIsSignupSuccess] = useState(false)
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search)
+      setIsSignupSuccess(params.get('signup') === 'success')
+    }
+  }, [])
 
   const handleLogin = async (formData: FormData) => {
     const res = await login(formData)
@@ -39,6 +47,11 @@ export default function LoginPage() {
         </div>
 
         <form action={handleLogin} className="space-y-6">
+          {isSignupSuccess && (
+            <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm">
+                ¡Registro completado! Ya puedes iniciar sesión con tus credenciales.
+            </div>
+          )}
           {error && (
             <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-red-600 text-sm">
                 {error}
@@ -110,6 +123,15 @@ export default function LoginPage() {
             Iniciar Sesión
           </button>
         </form>
+        
+        <div className="mt-6 text-center text-sm">
+          <p className="text-slate-500">
+            ¿No tienes cuenta?{' '}
+            <Link href="/signup" className="font-semibold text-avalia-blue hover:text-avalia-violet">
+              Regístrate gratis
+            </Link>
+          </p>
+        </div>
         
         <div className="mt-6">
             <Copyright />

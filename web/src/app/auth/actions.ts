@@ -89,3 +89,47 @@ export async function updatePassword(formData: FormData) {
   return { success: true }
 }
 
+export async function signUpCompanyAction(formData: FormData) {
+  const supabase = await createClient()
+
+  const email = formData.get('email') as string
+  const password = formData.get('password') as string
+  const companyName = formData.get('companyName') as string
+  const nit = formData.get('nit') as string
+
+  if (!email || !password || !companyName || !nit) {
+    return { error: 'Todos los campos son requeridos' }
+  }
+
+  if (password.length < 6) {
+    return { error: 'La contraseña debe tener al menos 6 caracteres' }
+  }
+
+  // Registrar en Supabase Auth inyectando metadatos para el trigger handle_new_user
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: {
+      data: {
+        company_name: companyName,
+        nit: nit,
+        role: 'admin'
+      }
+    }
+  })
+
+  if (error) {
+    console.error('[SIGNUP] Error en signUp de Supabase:', error.message)
+    return { error: error.message }
+  }
+
+  // Verificar si la sesión se inició automáticamente (ej. confirmación desactivada)
+  if (data?.session) {
+    revalidatePath('/', 'layout')
+    redirect('/')
+  } else {
+    // Si requiere confirmación de email
+    redirect('/login?signup=success')
+  }
+}
+

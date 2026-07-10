@@ -81,7 +81,9 @@ export async function GET(request: NextRequest) {
                 ),
                 profiles:client_id (
                     company_name,
-                    email
+                    email,
+                    plan_type,
+                    subscription_status
                 )
             `)
             .neq('status', 'pagada');
@@ -136,6 +138,12 @@ export async function GET(request: NextRequest) {
 
                 if (!payer) {
                     throw new Error('La factura no tiene un pagador asociado en la base de datos.');
+                }
+
+                // Validar que el cliente tenga suscripción activa para usar mensajería automatizada de cobro
+                if (client && client.subscription_status !== 'active') {
+                    console.log(`[CRON] Omitido envío de cobro automático para deudor de ${client.company_name} (Plan: ${client.plan_type || 'free'}, Estado: ${client.subscription_status || 'inactive'}). Requiere suscripción activa.`);
+                    continue;
                 }
 
                 const contactEmail = payer.contact_email;

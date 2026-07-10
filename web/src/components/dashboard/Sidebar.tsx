@@ -1,7 +1,7 @@
 'use client'
 
 import { logout } from '@/app/auth/actions'
-import { PieChart, UserSearch, UploadCloud, LogOut, LayoutDashboard, Settings } from 'lucide-react'
+import { PieChart, UserSearch, UploadCloud, LogOut, LayoutDashboard, Settings, CreditCard } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { AvaliaLogo } from '@/components/ui/Logo'
@@ -18,6 +18,7 @@ export function DashboardSidebar({ role }: SidebarProps) {
     { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['superadmin', 'comercial', 'cartera', 'client', 'admin'] },
     { href: '/dashboard/payers', label: 'Clientes', icon: UserSearch, roles: ['superadmin', 'comercial', 'admin'] },
     { href: '/dashboard/invoices', label: 'Facturas', icon: UploadCloud, roles: ['superadmin', 'cartera', 'admin'] },
+    { href: '/dashboard/subscription', label: 'Suscripción', icon: CreditCard, roles: ['superadmin', 'admin'] },
     { href: '/dashboard/profile', label: 'Configuración', icon: Settings, roles: ['superadmin', 'comercial', 'cartera', 'client', 'admin'] },
     // Nueva sección para gestión de usuarios solo para superadmin y global admin
     { href: '/dashboard/settings/users', label: 'Equipo', icon: Settings, roles: ['superadmin', 'admin'] },
