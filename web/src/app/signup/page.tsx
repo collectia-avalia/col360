@@ -20,6 +20,12 @@ export default function SignupPage() {
       const res = await signUpCompanyAction(formData)
       if (res?.error) {
         setError(res.error)
+      } else if (res?.success) {
+        if (res.autologin) {
+          window.location.href = '/dashboard'
+        } else {
+          window.location.href = '/login?signup=success'
+        }
       }
     } catch (err: any) {
       setError(err.message || 'Error inesperado durante el registro.')

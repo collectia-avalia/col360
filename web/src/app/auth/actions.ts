@@ -123,13 +123,11 @@ export async function signUpCompanyAction(formData: FormData) {
     return { error: error.message }
   }
 
-  // Verificar si la sesión se inició automáticamente (ej. confirmación desactivada)
+  // Verificar si la sesión se inició automáticamente
   if (data?.session) {
-    revalidatePath('/', 'layout')
-    redirect('/')
+    return { success: true, autologin: true }
   } else {
-    // Si requiere confirmación de email
-    redirect('/login?signup=success')
+    return { success: true, autologin: false }
   }
 }
 
