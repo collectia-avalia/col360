@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
-import { createStripeSubscriptionSessionAction, simulateSubscriptionActivationAction } from './actions';
+import { createWompiSubscriptionSessionAction, simulateSubscriptionActivationAction } from './actions';
 import { ShieldCheck, Mail, Calendar, CreditCard, CheckCircle2, AlertTriangle, ArrowRight } from 'lucide-react';
 import { revalidatePath } from 'next/cache';
 import Link from 'next/link';
@@ -50,12 +50,12 @@ export default async function SubscriptionPage({
   // Wrappers de acciones con firma compatible con formularios en React 19
   async function handleSubscribeMonthly() {
     'use server'
-    await createStripeSubscriptionSessionAction('monthly');
+    await createWompiSubscriptionSessionAction('monthly');
   }
 
   async function handleSubscribeAnnual() {
     'use server'
-    await createStripeSubscriptionSessionAction('annual');
+    await createWompiSubscriptionSessionAction('annual');
   }
 
   return (

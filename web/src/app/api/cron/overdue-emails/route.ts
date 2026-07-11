@@ -112,149 +112,120 @@ export async function GET(request: NextRequest) {
         const failures: { invoiceNumber: string; error: string }[] = [];
         const processedDetails: { invoiceNumber: string; diasMora: number; template: string; recipient: string }[] = [];
 
-        // 3. Iterar facturas
+        // 3. Filtrar y preparar las tareas que califican para envío
+        const tasksToProcess = [];
+        
         for (const invoice of invoices) {
             // Ignorar facturas anuladas
             const isAnulada = invoice.legal_declarations && (invoice.legal_declarations as any).anulada === true;
-            if (isAnulada) {
+            if (isAnulada) continue;
+
+            const dueStr = invoice.due_date;
+            const diasMora = getDaysDifference(todayBogotaStr, dueStr);
+
+            // Solo procesar si está en los días exactos: 1, 5, 10, 15, 30
+            if (![1, 5, 10, 15, 30].includes(diasMora)) continue;
+
+            const payer = invoice.payers as any;
+            const client = invoice.profiles as any;
+
+            if (!payer) continue;
+
+            // Validar que el cliente tenga suscripción activa para usar mensajería automatizada de cobro
+            if (client && client.subscription_status !== 'active') {
+                console.log(`[CRON] Omitido envío de cobro automático para deudor de ${client.company_name} (Plan: ${client.plan_type || 'free'}, Estado: ${client.subscription_status || 'inactive'}). Requiere suscripción activa.`);
                 continue;
             }
 
-            processedCount++;
-            const invoiceNum = invoice.invoice_number;
+            tasksToProcess.push({ invoice, diasMora, payer, client });
+        }
 
-            try {
-                // Calcular días de mora en base a la fecha de vencimiento y hoy en Bogotá
-                const dueStr = invoice.due_date;
-                const diasMora = getDaysDifference(todayBogotaStr, dueStr);
+        console.log(`[CRON] Total de tareas calificadas para envío: ${tasksToProcess.length}`);
 
-                // Solo procesar si está en los días exactos: 1, 5, 10, 15, 30
-                if (![1, 5, 10, 15, 30].includes(diasMora)) {
-                    continue;
-                }
-
-                const payer = invoice.payers as any;
-                const client = invoice.profiles as any;
-
-                if (!payer) {
-                    throw new Error('La factura no tiene un pagador asociado en la base de datos.');
-                }
-
-                // Validar que el cliente tenga suscripción activa para usar mensajería automatizada de cobro
-                if (client && client.subscription_status !== 'active') {
-                    console.log(`[CRON] Omitido envío de cobro automático para deudor de ${client.company_name} (Plan: ${client.plan_type || 'free'}, Estado: ${client.subscription_status || 'inactive'}). Requiere suscripción activa.`);
-                    continue;
-                }
-
-                const contactEmail = payer.contact_email;
-                if (!contactEmail) {
-                    throw new Error(`El pagador ${payer.razon_social} no tiene correo de contacto.`);
-                }
-
-                const clientName = client?.company_name || 'Avalia';
-                const contactName = payer.contact_name || 'Encargado de Cartera';
-                const razonSocial = payer.razon_social;
-                const formattedAmount = formatCurrency(Number(invoice.amount));
-                const formattedDueDate = formatLongDate(invoice.due_date);
-
-                let htmlContent = '';
-                let subject = '';
-                let templateName = '';
-
-                // Seleccionar plantilla correspondiente
-                switch (diasMora) {
-                    case 1:
-                        subject = `Recordatorio de pago: Factura N° ${invoiceNum} - ${clientName}`;
-                        templateName = 'Mora Día 1';
-                        htmlContent = Mora1Html({
-                            contactName,
-                            razonSocial,
-                            invoiceNumber: invoiceNum,
-                            amount: formattedAmount,
-                            dueDate: formattedDueDate,
-                            clientName
-                        });
-                        break;
-                    case 5:
-                        subject = `Segunda notificación: Pago pendiente Factura N° ${invoiceNum} - ${clientName}`;
-                        templateName = 'Mora Día 5';
-                        htmlContent = Mora5Html({
-                            contactName,
-                            razonSocial,
-                            invoiceNumber: invoiceNum,
-                            amount: formattedAmount,
-                            dueDate: formattedDueDate,
-                            clientName
-                        });
-                        break;
-                    case 10:
-                        subject = `Notificación urgente de mora: Factura N° ${invoiceNum} - ${clientName}`;
-                        templateName = 'Mora Día 10';
-                        htmlContent = Mora10Html({
-                            contactName,
-                            razonSocial,
-                            invoiceNumber: invoiceNum,
-                            amount: formattedAmount,
-                            dueDate: formattedDueDate,
-                            clientName
-                        });
-                        break;
-                    case 15:
-                        subject = `Suspensión de cupo: Notificación de mora Factura N° ${invoiceNum} - ${clientName}`;
-                        templateName = 'Mora Día 15';
-                        htmlContent = Mora15Html({
-                            contactName,
-                            razonSocial,
-                            invoiceNumber: invoiceNum,
-                            amount: formattedAmount,
-                            dueDate: formattedDueDate,
-                            clientName
-                        });
-                        break;
-                    case 30:
-                        subject = `Bloqueo definitivo y reporte central de riesgo: Factura N° ${invoiceNum} - ${clientName}`;
-                        templateName = 'Mora Día 30';
-                        htmlContent = Mora30Html({
-                            contactName,
-                            razonSocial,
-                            invoiceNumber: invoiceNum,
-                            amount: formattedAmount,
-                            dueDate: formattedDueDate,
-                            clientName
-                        });
-                        break;
-                }
-
-                if (htmlContent && subject) {
-                    console.log(`[CRON] Enviando correo de ${templateName} a ${contactEmail} para factura ${invoiceNum}`);
-                    
-                    const result = await sendEmail({
-                        to: contactEmail,
-                        subject: subject,
-                        html: htmlContent
-                    });
-
-                    if (!result.success) {
-                        throw new Error(result.error || 'Fallo desconocido al enviar por Resend.');
+        // 4. Ejecutar el procesamiento en batches de 5 concurrentes
+        const batchSize = 5;
+        for (let i = 0; i < tasksToProcess.length; i += batchSize) {
+            const batch = tasksToProcess.slice(i, i + batchSize);
+            
+            await Promise.all(batch.map(async ({ invoice, diasMora, payer, client }) => {
+                processedCount++;
+                const invoiceNum = invoice.invoice_number;
+                
+                try {
+                    const contactEmail = payer.contact_email;
+                    if (!contactEmail) {
+                        throw new Error(`El pagador ${payer.razon_social} no tiene correo de contacto.`);
                     }
 
-                    sentCount++;
-                    processedDetails.push({
+                    const clientName = client?.company_name || 'Avalia';
+                    const contactName = payer.contact_name || 'Encargado de Cartera';
+                    const razonSocial = payer.razon_social;
+                    const formattedAmount = formatCurrency(Number(invoice.amount));
+                    const formattedDueDate = formatLongDate(invoice.due_date);
+
+                    let htmlContent = '';
+                    let subject = '';
+                    let templateName = '';
+
+                    switch (diasMora) {
+                        case 1:
+                            subject = `Recordatorio de pago: Factura N° ${invoiceNum} - ${clientName}`;
+                            templateName = 'Mora Día 1';
+                            htmlContent = Mora1Html({ contactName, razonSocial, invoiceNumber: invoiceNum, amount: formattedAmount, dueDate: formattedDueDate, clientName });
+                            break;
+                        case 5:
+                            subject = `Segunda notificación: Pago pendiente Factura N° ${invoiceNum} - ${clientName}`;
+                            templateName = 'Mora Día 5';
+                            htmlContent = Mora5Html({ contactName, razonSocial, invoiceNumber: invoiceNum, amount: formattedAmount, dueDate: formattedDueDate, clientName });
+                            break;
+                        case 10:
+                            subject = `Notificación urgente de mora: Factura N° ${invoiceNum} - ${clientName}`;
+                            templateName = 'Mora Día 10';
+                            htmlContent = Mora10Html({ contactName, razonSocial, invoiceNumber: invoiceNum, amount: formattedAmount, dueDate: formattedDueDate, clientName });
+                            break;
+                        case 15:
+                            subject = `Suspensión de cupo: Notificación de mora Factura N° ${invoiceNum} - ${clientName}`;
+                            templateName = 'Mora Día 15';
+                            htmlContent = Mora15Html({ contactName, razonSocial, invoiceNumber: invoiceNum, amount: formattedAmount, dueDate: formattedDueDate, clientName });
+                            break;
+                        case 30:
+                            subject = `Bloqueo definitivo y reporte central de riesgo: Factura N° ${invoiceNum} - ${clientName}`;
+                            templateName = 'Mora Día 30';
+                            htmlContent = Mora30Html({ contactName, razonSocial, invoiceNumber: invoiceNum, amount: formattedAmount, dueDate: formattedDueDate, clientName });
+                            break;
+                    }
+
+                    if (htmlContent && subject) {
+                        console.log(`[CRON] Enviando correo de ${templateName} a ${contactEmail} para factura ${invoiceNum}`);
+                        
+                        const result = await sendEmail({
+                            to: contactEmail,
+                            subject: subject,
+                            html: htmlContent
+                        });
+
+                        if (!result.success) {
+                            throw new Error(result.error || 'Fallo al enviar correo por Resend.');
+                        }
+
+                        sentCount++;
+                        processedDetails.push({
+                            invoiceNumber: invoiceNum,
+                            diasMora,
+                            template: templateName,
+                            recipient: contactEmail
+                        });
+                    }
+                } catch (err: any) {
+                    failedCount++;
+                    const errMsg = err.message || err;
+                    console.error(`[CRON] Error procesando factura ${invoiceNum}: ${errMsg}`);
+                    failures.push({
                         invoiceNumber: invoiceNum,
-                        diasMora,
-                        template: templateName,
-                        recipient: contactEmail
+                        error: errMsg
                     });
                 }
-            } catch (err: any) {
-                failedCount++;
-                const errMsg = err.message || err;
-                console.error(`[CRON] Error procesando factura ${invoiceNum}: ${errMsg}`);
-                failures.push({
-                    invoiceNumber: invoiceNum,
-                    error: errMsg
-                });
-            }
+            }));
         }
 
         console.log(`[CRON] Fin del proceso. Enviados: ${sentCount}, Fallados: ${failedCount}, Procesados: ${processedCount}`);

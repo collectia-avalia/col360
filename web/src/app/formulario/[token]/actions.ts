@@ -210,43 +210,24 @@ export async function submitCreditStudyByTokenAction(formData: FormData) {
         return { error: 'Token invalido o expirado' }
     }
 
-    // 2. Generar sesión de Stripe Checkout de forma defensiva ($45.000 COP)
-    let stripeSessionUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard/payers/${payer.id}`
-    let stripeSessionId = 'simulated_session_id'
-
+    // 2. Generar sesión de Wompi Checkout ($45.000 COP)
+    const wompiReference = `study-${payer.id}-${Date.now()}`;
+    const redirectUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard/payers/${payer.id}?payment=success`;
+    
+    let checkoutUrl = '';
     try {
-        if (process.env.STRIPE_SECRET_KEY) {
-            const { stripe } = require('@/lib/stripe')
-            const session = await stripe.checkout.sessions.create({
-                payment_method_types: ['card'],
-                line_items: [
-                    {
-                        price_data: {
-                            currency: 'cop',
-                            product_data: {
-                                name: `Estudio de Crédito Comercial SARC - ${payer.razon_social}`,
-                                description: 'Análisis automatizado cuantitativo, cualitativo y de centrales de riesgo por Inteligencia Artificial (SARC Wy CF).',
-                            },
-                            unit_amount: 4500000, // $45.000 COP en centavos
-                        },
-                        quantity: 1,
-                    },
-                ],
-                mode: 'payment',
-                success_url: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard/payers/${payer.id}?payment=success`,
-                cancel_url: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard/payers/${payer.id}?payment=cancel`,
-                client_reference_id: payer.id,
-            })
-            if (session.url) stripeSessionUrl = session.url
-            if (session.id) stripeSessionId = session.id
-        } else {
-            console.warn('[STRIPE] STRIPE_SECRET_KEY no está configurada en entorno. Utilizando sesión simulada.')
-        }
+        const { getWompiCheckoutUrl } = require('@/lib/wompi');
+        checkoutUrl = getWompiCheckoutUrl({
+            reference: wompiReference,
+            amountInCents: 4500000,
+            redirectUrl: redirectUrl
+        });
     } catch (err: any) {
-        console.error('[STRIPE] Error al crear sesión de Checkout:', err.message || err)
+        console.error('[WOMPI] Error al generar Checkout URL:', err.message || err);
+        checkoutUrl = redirectUrl; // Fallback
     }
 
-    // 3. Actualizar datos financieros, estado del estudio a 'pending' y el ID de sesión de Stripe
+    // 3. Actualizar datos financieros, estado del estudio a 'pending' y la referencia de Wompi
     const updateData: Record<string, unknown> = {
         commercial_address: formData.get('commercial_address') as string,
         legal_representative: formData.get('legal_representative') as string,
@@ -256,10 +237,10 @@ export async function submitCreditStudyByTokenAction(formData: FormData) {
         net_utility: Number(formData.get('net_utility')) || 0,
         invitation_status: 'completed',
         study_payment_status: 'pending',
-        stripe_session_id: stripeSessionId
-    }
+        stripe_session_id: wompiReference
+    };
 
-    console.log('[FormularioAction] Guardando datos financieros y de Stripe para payer ID:', payer.id)
+    console.log('[FormularioAction] Guardando datos financieros y de Wompi para payer ID:', payer.id)
 
     const { error: updateError } = await supabaseAdmin
         .from('payers')
@@ -288,9 +269,9 @@ export async function submitCreditStudyByTokenAction(formData: FormData) {
                         <p style="color: #334155; font-size: 15px; line-height: 1.6;">Tu cliente <strong>${payer.razon_social}</strong> ha terminado de diligenciar su formulario y cargar sus estados financieros.</p>
                         <p style="color: #334155; font-size: 15px; line-height: 1.6;">Para activar el análisis inteligente bajo el modelo <strong>SARC Wy CF</strong> y ver las recomendaciones de cupo, debes realizar el pago del estudio por valor de <strong>$45.000 COP</strong>.</p>
                         <div style="text-align: center; margin: 35px 0;">
-                            <a href="${stripeSessionUrl}" target="_blank" style="background-color: #6366f1; color: #ffffff; padding: 14px 28px; text-decoration: none; font-weight: bold; border-radius: 8px; box-shadow: 0 4px 10px rgba(99, 102, 241, 0.2); display: inline-block;">Pagar Estudio de Crédito ($45.000)</a>
+                            <a href="${checkoutUrl}" target="_blank" style="background-color: #6366f1; color: #ffffff; padding: 14px 28px; text-decoration: none; font-weight: bold; border-radius: 8px; box-shadow: 0 4px 10px rgba(99, 102, 241, 0.2); display: inline-block;">Pagar Estudio de Crédito ($45.000)</a>
                         </div>
-                        <p style="color: #64748b; font-size: 12px; text-align: center;">Si tienes problemas con el botón, copia y pega el siguiente enlace:<br><a href="${stripeSessionUrl}" style="color: #6366f1;">${stripeSessionUrl}</a></p>
+                        <p style="color: #64748b; font-size: 12px; text-align: center;">Si tienes problemas con el botón, copia y pega el siguiente enlace:<br><a href="${checkoutUrl}" style="color: #6366f1;">${checkoutUrl}</a></p>
                         <hr style="border: 0; border-top: 1px solid #f1f5f9; margin: 25px 0;" />
                         <p style="color: #94a3b8; font-size: 11px; text-align: center;">Mensaje automático enviado por Avalia SaaS. Todos los derechos reservados.</p>
                     </div>
