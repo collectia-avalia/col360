@@ -143,9 +143,9 @@ export default function SignupPage() {
         <div className="mt-6 text-center text-sm">
           <p className="text-slate-500">
             ¿Ya tienes una cuenta?{' '}
-            <Link href="/login" className="font-semibold text-avalia-blue hover:text-avalia-violet">
+            <a href="/login" className="font-semibold text-avalia-blue hover:text-avalia-violet">
               Inicia sesión aquí
-            </Link>
+            </a>
           </p>
         </div>
         
