@@ -5,9 +5,10 @@ import { requestSignupOtpAction, verifySignupOtpAction } from '../auth/actions'
 import { AvaliaLogo } from '@/components/ui/Logo'
 import { Copyright } from '@/components/ui/Copyright'
 import { SlideCaptcha } from '@/components/ui/SlideCaptcha'
-import { Building2, Mail, Lock, Shield, User, Phone, MapPin, ArrowLeft, KeyRound } from 'lucide-react'
+import { Building2, Mail, Lock, Shield, User, Phone, MapPin, ArrowLeft, KeyRound, Eye, EyeOff } from 'lucide-react'
 
 export default function SignupPage() {
+  const [showPassword, setShowPassword] = useState(false)
   const [step, setStep] = useState<'form' | 'otp'>('form')
   const [isCaptchaVerified, setIsCaptchaVerified] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -232,7 +233,7 @@ export default function SignupPage() {
                   </div>
                 </div>
 
-                <div>
+                 <div>
                   <label htmlFor="password" className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
                     Contraseña
                   </label>
@@ -240,12 +241,19 @@ export default function SignupPage() {
                     <input
                       id="password"
                       name="password"
-                      type="password"
+                      type={showPassword ? 'text' : 'password'}
                       required
-                      className="block w-full pl-10 pr-4 py-2.5 rounded-lg border border-gray-200 bg-white/50 focus:bg-white focus:ring-2 focus:ring-avalia-blue focus:border-transparent transition-all outline-none text-slate-800 text-sm placeholder-slate-400"
+                      className="block w-full pl-10 pr-10 py-2.5 rounded-lg border border-gray-200 bg-white/50 focus:bg-white focus:ring-2 focus:ring-avalia-blue focus:border-transparent transition-all outline-none text-slate-800 text-sm placeholder-slate-400"
                       placeholder="Mínimo 6 caracteres"
                     />
                     <Lock className="absolute left-3.5 top-3.5 w-4 h-4 text-slate-400" />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-3 text-slate-400 hover:text-slate-600 transition-colors focus:outline-none"
+                    >
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
                   </div>
                 </div>
               </div>

@@ -6,9 +6,11 @@ import { AvaliaLogo } from '@/components/ui/Logo'
 import { Copyright } from '@/components/ui/Copyright'
 import { SlideCaptcha } from '@/components/ui/SlideCaptcha'
 import Link from 'next/link'
+import { Lock, Eye, EyeOff } from 'lucide-react'
 
 
 export default function LoginPage() {
+  const [showPassword, setShowPassword] = useState(false)
   const [isCaptchaVerified, setIsCaptchaVerified] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isSignupSuccess, setIsSignupSuccess] = useState(false)
@@ -82,11 +84,19 @@ export default function LoginPage() {
               <input
                 id="password"
                 name="password"
-                type="password"
+                type={showPassword ? 'text' : 'password'}
                 required
-                className="block w-full px-4 py-3 rounded-lg border-gray-200 bg-white/50 focus:bg-white focus:ring-2 focus:ring-avalia-blue focus:border-transparent transition-all outline-none text-slate-800 placeholder-slate-400"
+                className="block w-full pl-10 pr-10 py-3 rounded-lg border-gray-200 bg-white/50 focus:bg-white focus:ring-2 focus:ring-avalia-blue focus:border-transparent transition-all outline-none text-slate-800 placeholder-slate-400"
                 placeholder="••••••••"
               />
+              <Lock className="absolute left-3.5 top-3.5 w-4 h-4 text-slate-400" />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-3.5 text-slate-400 hover:text-slate-600 transition-colors focus:outline-none"
+              >
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
             </div>
           </div>
 
