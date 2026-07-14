@@ -147,7 +147,7 @@ export async function requestSignupOtpAction(formData: FormData) {
 
     if (dbError) {
       console.error('[SIGNUP_OTP] Error guardando OTP en base de datos:', dbError.message)
-      return { error: 'Error interno del servidor. Por favor intenta más tarde.' }
+      return { error: `Error de BD: ${dbError.message} (${dbError.details || 'sin detalles'})` }
     }
 
     // 4. Enviar OTP por correo al usuario
@@ -172,7 +172,7 @@ export async function requestSignupOtpAction(formData: FormData) {
     console.log(`[SIGNUP_OTP_DEBUG] OTP enviado exitosamente para ${email}: ${otpCode}`)
   } catch (err: any) {
     console.error('[SIGNUP_OTP] Excepción crítica en registro OTP:', err.message || err)
-    return { error: 'No se pudo enviar el correo de verificación. Revisa el correo o intenta nuevamente.' }
+    return { error: `Excepción de Servidor: ${err.message || 'Error desconocido'}` }
   }
 
   return { success: true }
