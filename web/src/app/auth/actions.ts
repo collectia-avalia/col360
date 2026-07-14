@@ -151,7 +151,7 @@ export async function requestSignupOtpAction(formData: FormData) {
     }
 
     // 4. Enviar OTP por correo al usuario
-    await sendEmail({
+    const emailResult = await sendEmail({
       to: email,
       subject: `Código de verificación de registro - Avalia`,
       html: `
@@ -169,6 +169,14 @@ export async function requestSignupOtpAction(formData: FormData) {
         </div>
       `
     })
+
+    if (!emailResult.success) {
+      console.error('[SIGNUP_OTP] Error al enviar email:', emailResult.error)
+      // Eliminar registro temporal si falló el correo
+      await supabaseAdmin.from('signup_otps').delete().eq('email', email)
+      return { error: `Error de Correo: ${emailResult.error}` }
+    }
+
     console.log(`[SIGNUP_OTP_DEBUG] OTP enviado exitosamente para ${email}: ${otpCode}`)
   } catch (err: any) {
     console.error('[SIGNUP_OTP] Excepción crítica en registro OTP:', err.message || err)
@@ -218,7 +226,7 @@ export async function verifySignupOtpAction(email: string, otpCode: string) {
         contact_name: signupData.contactName,
         phone: signupData.phone,
         address: signupData.address,
-        role: 'admin' // Administrador de la empresa inquilina
+        role: 'client' // Rol correcto del enum de Supabase
       }
     })
 
