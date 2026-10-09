@@ -29,16 +29,23 @@ export async function updateSession(request: NextRequest) {
     }
   )
 
-  // IMPORTANTE: No proteger rutas estaticas, de auth ni formularios publicos
-  if (request.nextUrl.pathname.startsWith('/_next') ||
-    request.nextUrl.pathname.startsWith('/auth') ||
-    request.nextUrl.pathname.startsWith('/invite') ||
-    request.nextUrl.pathname.startsWith('/formulario') ||
-    request.nextUrl.pathname.startsWith('/forgot-password') ||
-    request.nextUrl.pathname.startsWith('/reset-password') ||
-    request.nextUrl.pathname.startsWith('/signup') ||
-    request.nextUrl.pathname.startsWith('/static') ||
-    request.nextUrl.pathname.includes('.')) {
+  // IMPORTANTE: No proteger rutas estaticas, de auth ni formularios publicos.
+  // /api/cron y /api/webhooks llegan sin sesión (Vercel Cron, Wompi) y se autentican
+  // ellos mismos (CRON_SECRET, firma del evento).
+  // Este filtro es solo de navegación: la autorización real está en cada página,
+  // server action y route handler (lib/auth/guards.ts).
+  const path = request.nextUrl.pathname
+  if (path.startsWith('/_next') ||
+    path.startsWith('/auth') ||
+    path.startsWith('/formulario') ||
+    path.startsWith('/invite/') ||
+    path.startsWith('/forgot-password') ||
+    path.startsWith('/reset-password') ||
+    path.startsWith('/signup') ||
+    path.startsWith('/static') ||
+    path.startsWith('/api/cron/') ||
+    path.startsWith('/api/webhooks/') ||
+    /\.(?:ico|png|jpe?g|gif|webp|svg|css|js|map|txt|xml|woff2?)$/.test(path)) {
     return supabaseResponse
   }
 
@@ -55,23 +62,15 @@ export async function updateSession(request: NextRequest) {
 
   // 2. Si hay usuario, verificar rol y redirigir
   if (user) {
-    // ESTRATEGIA OPTIMIZADA: Leer rol desde metadata (inyectado por admin)
-    // Esto evita consultas a BD bloqueadas por RLS en el middleware
-    const metadataRole = user.user_metadata?.role
-
-    // NUEVA ESTRATEGIA: Priorizar DB para evitar metadatos viejos
-    let dbRole = null
+    // El rol sale SOLO de public.profiles (la política RLS permite leer el propio perfil).
+    // user_metadata no sirve: el propio usuario puede modificarlo.
     const { data: profile } = await supabase
       .from('profiles')
       .select('role')
       .eq('id', user.id)
-      .single()
-    dbRole = profile?.role
+      .maybeSingle()
 
-    const role = dbRole || metadataRole || 'client'
-
-    // DEBUG LOGS
-    console.log(`[Middleware] Usuario: ${user.email} | Rol: ${role}`)
+    const role = profile?.role || 'client'
 
     // Si intenta ir a login estando logueado, redirigir a su home
     if (request.nextUrl.pathname.startsWith('/login')) {

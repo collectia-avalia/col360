@@ -4,6 +4,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { z } from 'zod'
+import { denyUnlessPlatformAdmin } from '@/lib/auth/guards'
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const pdfParse = require('pdf-parse/lib/pdf-parse.js')
@@ -16,6 +17,9 @@ const approvalSchema = z.object({
 })
 
 export async function processPayerAction(formData: FormData) {
+  const denied = await denyUnlessPlatformAdmin()
+  if (denied) return { error: denied.error }
+
   // Usamos Admin Client para saltar RLS y asegurar la operación
   const supabase = createAdminClient()
 
@@ -65,7 +69,7 @@ export async function processPayerAction(formData: FormData) {
 
     // 3. Calcular el límite
     const totalBag = clientProfile.total_bag || 0
-    const maxExposure = clientProfile.max_exposure || 100 // Default 100%
+    const maxExposure = clientProfile.max_exposure ?? 100 // Default 100%
     const exposureLimit = totalBag * (maxExposure / 100)
 
     // 4. Validar
@@ -110,6 +114,9 @@ export async function processPayerAction(formData: FormData) {
  * Server Action para que el administrador pueda subir documentos manualmente (como la historia de crédito).
  */
 export async function uploadPayerDocumentAdminAction(payerId: string, formData: FormData) {
+  const denied = await denyUnlessPlatformAdmin()
+  if (denied) return { error: denied.error }
+
     const file = formData.get('file') as File | null
     const docType = formData.get('docType') as string
 
@@ -158,6 +165,9 @@ export async function uploadPayerDocumentAdminAction(payerId: string, formData: 
  * Server Action para ejecutar el análisis de crédito con IA (Gemini) basado en la historia de crédito cargada.
  */
 export async function analyzeCreditStudyAction(payerId: string) {
+  const denied = await denyUnlessPlatformAdmin()
+  if (denied) return { error: denied.error }
+
     const supabase = createAdminClient()
 
     try {

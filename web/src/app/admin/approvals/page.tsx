@@ -1,6 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import Link from 'next/link'
 import { FileText } from 'lucide-react'
+import { requirePlatformAdminPage } from '@/lib/auth/guards'
 
 type PayerRow = {
   id: string
@@ -46,6 +47,8 @@ export default async function ApprovalsPage({
 }: {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>
 }) {
+  await requirePlatformAdminPage()
+
   const params = await searchParams
   const supabase = createAdminClient()
   const statusFilter = (params['status'] as string) || 'pendiente'

@@ -2,6 +2,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { ArrowLeft, Download } from 'lucide-react'
 import Link from 'next/link'
 import EditClientForm from './edit-form'
+import { requirePlatformAdminPage } from '@/lib/auth/guards'
 
 const formatCurrency = (val: number) =>
   new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(val)
@@ -19,6 +20,8 @@ function getDisplayStatus(status: string, diasMora: number): string {
 }
 
 export default async function EditClientPage({ params }: { params: Promise<{ id: string }> }) {
+  await requirePlatformAdminPage()
+
   const { id } = await params
   const supabase = createAdminClient()
   

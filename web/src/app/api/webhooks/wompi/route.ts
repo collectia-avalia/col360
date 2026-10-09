@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { validateWebhookSignature } from '@/lib/wompi';
+import { validateWebhookSignature, parseWompiReference, WOMPI_PRICES_IN_CENTS } from '@/lib/wompi';
 import { createAdminClient } from '@/lib/supabase/admin';
 
 export async function POST(request: Request) {
@@ -33,7 +33,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ received: true, error: 'No transaction data' });
     }
 
-    const { id: transactionId, reference, status, amount_in_cents } = transaction;
+    const { id: transactionId, reference, status, amount_in_cents, currency } = transaction;
 
     console.log(`[WOMPI_WEBHOOK] Transacción ID: ${transactionId}, Referencia: ${reference}, Estado: ${status}`);
 
@@ -43,41 +43,48 @@ export async function POST(request: Request) {
         return NextResponse.json({ received: true, message: 'Status is not APPROVED' });
     }
 
+    const parsed = parseWompiReference(reference);
+    if (!parsed) {
+        console.error('[WOMPI_WEBHOOK] Formato de referencia inválido:', reference);
+        return new NextResponse('Invalid reference format', { status: 400 });
+    }
+
+    // El monto pagado debe corresponder exactamente al producto de la referencia
+    const expectedAmount = parsed.kind === 'study' ? WOMPI_PRICES_IN_CENTS.study : WOMPI_PRICES_IN_CENTS[parsed.plan];
+    if (Number(amount_in_cents) !== expectedAmount || (currency && currency !== 'COP')) {
+        console.error(`[WOMPI_WEBHOOK] Monto inesperado para ${reference}: ${amount_in_cents} ${currency}`);
+        return new NextResponse('Amount mismatch', { status: 400 });
+    }
+
     const supabaseAdmin = createAdminClient();
 
     // 3. Procesar según el tipo de referencia (Idempotente)
     try {
-        // CASO A: Pago único por Estudio de Riesgo On-Demand ($45.000 COP)
-        if (reference.startsWith('study-')) {
-            const parts = reference.split('-');
-            const payerId = parts[1];
+        // CASO A: Pago único por Estudio de Riesgo On-Demand
+        if (parsed.kind === 'study') {
+            const { payerId } = parsed;
 
-            if (!payerId) {
-                console.error('[WOMPI_WEBHOOK] ID de pagador ausente en la referencia:', reference);
-                return new NextResponse('Invalid reference format', { status: 400 });
-            }
-
-            console.log(`[WOMPI_WEBHOOK] Validando idempotencia para deudor ID: ${payerId}`);
-            
-            // Consultar estado actual
             const { data: payer, error: selectError } = await supabaseAdmin
                 .from('payers')
-                .select('study_payment_status')
+                .select('study_payment_status, stripe_session_id')
                 .eq('id', payerId)
                 .single();
 
-            if (selectError) {
-                console.error('[WOMPI_WEBHOOK] Error al consultar pagador:', selectError.message);
+            if (selectError || !payer) {
+                console.error('[WOMPI_WEBHOOK] Error al consultar pagador:', selectError?.message);
                 return new NextResponse('Database Lookup Error', { status: 500 });
             }
 
-            // Si ya está marcado como pago, responder con 200 OK inmediatamente (Evita re-procesamiento)
-            if (payer?.study_payment_status === 'paid') {
-                console.log(`[WOMPI_WEBHOOK] Pago para deudor ${payerId} ya había sido procesado previamente. Saltando.`);
+            if (payer.study_payment_status === 'paid') {
                 return NextResponse.json({ received: true, message: 'Already processed as paid' });
             }
 
-            // Actualizar a PAID
+            // La referencia debe ser la última generada para este pagador
+            if (payer.stripe_session_id && payer.stripe_session_id !== reference) {
+                console.error(`[WOMPI_WEBHOOK] Referencia ${reference} no coincide con la registrada para el pagador ${payerId}`);
+                return new NextResponse('Reference mismatch', { status: 400 });
+            }
+
             const { error: updateError } = await supabaseAdmin
                 .from('payers')
                 .update({ study_payment_status: 'paid' })
@@ -92,56 +99,40 @@ export async function POST(request: Request) {
         }
 
         // CASO B: Pago de Suscripción Premium SaaS mensual/anual
-        else if (reference.startsWith('sub-')) {
-            const parts = reference.split('-');
-            const profileId = parts[1];
-            const plan = parts[2]; // 'monthly' o 'annual'
+        else {
+            const { profileId, plan } = parsed;
+            const durationDays = plan === 'monthly' ? 30 : 365;
 
-            if (!profileId || !plan) {
-                console.error('[WOMPI_WEBHOOK] Formato de referencia de suscripción inválido:', reference);
-                return new NextResponse('Invalid reference format', { status: 400 });
-            }
-
-            console.log(`[WOMPI_WEBHOOK] Procesando suscripción para inquilino perfil ID: ${profileId}, Plan: ${plan}`);
-
-            // Calcular expiración según plan
-            const isMonthly = plan === 'monthly';
-            const durationDays = isMonthly ? 30 : 365;
-            const expiresAt = new Date();
-            expiresAt.setDate(expiresAt.getDate() + durationDays);
-
-            // Consultar vigencia actual para evitar duplicación
             const { data: profile, error: selectError } = await supabaseAdmin
                 .from('profiles')
-                .select('subscription_status, subscription_expires_at')
+                .select('subscription_status, subscription_expires_at, last_payment_reference')
                 .eq('id', profileId)
                 .single();
 
-            if (selectError) {
-                console.error('[WOMPI_WEBHOOK] Error al consultar perfil del cliente:', selectError.message);
+            if (selectError || !profile) {
+                console.error('[WOMPI_WEBHOOK] Error al consultar perfil del cliente:', selectError?.message);
                 return new NextResponse('Database Lookup Error', { status: 500 });
             }
 
-            // Si ya está activo y la expiración es lejana (evitar dobles notificaciones en el mismo minuto)
-            if (profile?.subscription_status === 'active' && profile.subscription_expires_at) {
-                const currentExpiry = new Date(profile.subscription_expires_at);
-                const diffTime = Math.abs(currentExpiry.getTime() - new Date().getTime());
-                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                
-                // Si ya fue renovado por este mismo webhook recientemente
-                if (diffDays > 25 && isMonthly) {
-                    console.log(`[WOMPI_WEBHOOK] Suscripción del cliente ${profileId} ya se encuentra activa y renovada. Saltando.`);
-                    return NextResponse.json({ received: true, message: 'Subscription already renewed' });
-                }
+            // Idempotencia: Wompi reintenta el mismo evento
+            if (profile.last_payment_reference === reference) {
+                return NextResponse.json({ received: true, message: 'Already processed' });
             }
 
-            // Actualizar suscripción
+            // Renovación: se suma a la vigencia actual si sigue activa
+            const now = new Date();
+            const currentExpiry = profile.subscription_expires_at ? new Date(profile.subscription_expires_at) : null;
+            const base = currentExpiry && currentExpiry > now ? currentExpiry : now;
+            const expiresAt = new Date(base);
+            expiresAt.setDate(expiresAt.getDate() + durationDays);
+
             const { error: updateError } = await supabaseAdmin
                 .from('profiles')
                 .update({
                     plan_type: plan,
                     subscription_status: 'active',
-                    subscription_expires_at: expiresAt.toISOString()
+                    subscription_expires_at: expiresAt.toISOString(),
+                    last_payment_reference: reference
                 })
                 .eq('id', profileId);
 
@@ -150,10 +141,10 @@ export async function POST(request: Request) {
                 return new NextResponse('Database Update Error', { status: 500 });
             }
 
-            console.log(`[WOMPI_WEBHOOK] Suscripción SaaS para el cliente ${profileId} activada exitosamente hasta ${expiresAt.toISOString()}.`);
+            console.log(`[WOMPI_WEBHOOK] Suscripción SaaS para el cliente ${profileId} activada hasta ${expiresAt.toISOString()}.`);
         }
-    } catch (err: any) {
-        console.error('[WOMPI_WEBHOOK] Error crítico al procesar la lógica de negocio:', err.message || err);
+    } catch (err: unknown) {
+        console.error('[WOMPI_WEBHOOK] Error crítico al procesar la lógica de negocio:', err);
         return new NextResponse('Internal Server Error', { status: 500 });
     }
 

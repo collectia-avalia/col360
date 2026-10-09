@@ -1,7 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
-import { createWompiSubscriptionSessionAction, simulateSubscriptionActivationAction } from './actions';
+import { createWompiSubscriptionSessionAction } from './actions';
 import { ShieldCheck, Mail, Calendar, CreditCard, CheckCircle2, AlertTriangle, ArrowRight } from 'lucide-react';
-import { revalidatePath } from 'next/cache';
 import Link from 'next/link';
 
 export const dynamic = 'force-dynamic';
@@ -14,7 +13,6 @@ export default async function SubscriptionPage({
   const sParams = await searchParams;
   const isPaymentSuccess = sParams['payment'] === 'success';
   const isPaymentCancel = sParams['payment'] === 'cancel';
-  const isSimulated = sParams['simulated'] === 'true';
 
   const supabase = await createClient();
 
@@ -34,18 +32,6 @@ export default async function SubscriptionPage({
   const isSubscribed = profile?.subscription_status === 'active';
   const planType = profile?.plan_type;
   const expiresAt = profile?.subscription_expires_at;
-
-  // Manejar simulación automática de checkout completado en base de datos si viene en la URL
-  if (isPaymentSuccess && isSimulated && user) {
-    await simulateSubscriptionActivationAction();
-  }
-
-  // Server Action inline para procesar activación manual rápida
-  async function handleSimulateActivation() {
-    'use server'
-    await simulateSubscriptionActivationAction();
-    revalidatePath('/dashboard/subscription');
-  }
 
   // Wrappers de acciones con firma compatible con formularios en React 19
   async function handleSubscribeMonthly() {
@@ -221,21 +207,6 @@ export default async function SubscriptionPage({
           Nuestra automatización de cartera evalúa el estado de pago de tus facturas cada mañana y envía correos electrónicos profesionales a tus deudores. Estos correos utilizan el pie de firma oficial de **Avalia** con canales de WhatsApp y teléfono, mejorando la efectividad del cobro en un **38%** de forma comprobada sin que tengas que redactar un solo correo.
         </p>
       </div>
-
-      {/* Botón de Simulación de Activación (Solo en desarrollo local) */}
-      {process.env.NODE_ENV === 'development' && !isSubscribed && (
-        <div className="border border-dashed border-slate-200 rounded-xl p-4 bg-slate-50 flex items-center justify-between">
-          <div>
-            <p className="text-xs font-bold text-slate-800">Modo de Pruebas Comercial (Desarrollo)</p>
-            <p className="text-[10px] text-slate-400 mt-0.5">Activa la suscripción inmediatamente simulando el webhook de Stripe para pruebas locales.</p>
-          </div>
-          <form action={handleSimulateActivation}>
-            <button type="submit" className="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 text-[11px] font-bold rounded-lg transition-colors flex items-center gap-1">
-              Simular Activación <ArrowRight className="w-3 h-3" />
-            </button>
-          </form>
-        </div>
-      )}
 
     </div>
   );

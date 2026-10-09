@@ -2,37 +2,33 @@
 
 import React from 'react'
 
-import { createClient } from '@/lib/supabase/server'
-import { ensureUserProfile, getUserProfile } from '@/lib/supabase/profile'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { tenantOrError } from '@/lib/auth/guards'
 import { revalidatePath } from 'next/cache'
-import { redirect } from 'next/navigation'
 import { z } from 'zod'
-import { sendEmail } from '@/lib/actions/email'
+import { sendEmail } from '@/lib/email/send'
 import { InvoiceEmail } from '@/components/emails/InvoiceEmail'
 
 const invoiceSchema = z.object({
   invoiceNumber: z.string().min(1),
   payerId: z.string().uuid(),
-  amount: z.string(), // Input number string
-  issueDate: z.string(),
-  dueDate: z.string(),
+  amount: z.coerce.number().positive().finite(),
+  issueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   fundsOrigin: z.literal('on'),
   factoringTerms: z.literal('on'),
 })
 
+const INVOICE_STATUSES = ['vigente', 'vencida', 'pagada']
+const ALLOWED_INVOICE_EXTENSIONS = ['pdf', 'xml']
+const MAX_INVOICE_FILE_BYTES = 10 * 1024 * 1024
+
 export async function createInvoiceAction(formData: FormData) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) return { error: 'No autenticado' }
-
-  const profile = await getUserProfile(supabase)
-  if (!profile) return { error: 'No autorizado' }
-
-  // Validar Rol
-  if (profile.role !== 'superadmin' && profile.role !== 'cartera') {
-    return { error: 'No tienes permisos para cargar facturas (Requiere rol Superadmin o Cartera)' }
-  }
+  // Validar rol y empresa (las escrituras van con service_role tras este control)
+  const auth = await tenantOrError('superadmin', 'cartera')
+  if ('error' in auth) return { error: 'No tienes permisos para cargar facturas (Requiere rol Superadmin o Cartera)' }
+  const { profile, companyId } = auth
+  const supabase = createAdminClient()
 
   // 1. Validar Datos
   const rawData = {
@@ -53,8 +49,11 @@ export async function createInvoiceAction(formData: FormData) {
     return { error: 'Datos inválidos', details: validation.error.flatten().fieldErrors }
   }
 
-  const { invoiceNumber, payerId, amount, issueDate, dueDate } = validation.data
-  const numericAmount = parseFloat(amount)
+  const { invoiceNumber, payerId, amount: numericAmount, issueDate, dueDate } = validation.data
+
+  if (dueDate < issueDate) {
+    return { error: 'La fecha de vencimiento no puede ser anterior a la fecha de emisión.' }
+  }
 
   // --- VALIDACIÓN DE BLOQUEO POR MORA ---
   const formatter = new Intl.DateTimeFormat('fr-CA', {
@@ -69,6 +68,7 @@ export async function createInvoiceAction(formData: FormData) {
     .from('invoices')
     .select('id, legal_declarations')
     .eq('payer_id', payerId)
+    .eq('company_id', companyId)
     .neq('status', 'pagada')
     .lt('due_date', todayBogotaStr)
 
@@ -94,6 +94,7 @@ export async function createInvoiceAction(formData: FormData) {
     .from('payers')
     .select('risk_status, approved_quota')
     .eq('id', payerId)
+    .eq('company_id', companyId)
     .single()
 
   if (payerError || !payer) {
@@ -142,8 +143,15 @@ export async function createInvoiceAction(formData: FormData) {
   let fileUrl = null
 
   if (file && file.size > 0) {
-    const fileExt = file.name.split('.').pop()
-    const filePath = `${profile.company_id}/${payerId}/${invoiceNumber}_${Date.now()}.${fileExt}`
+    const fileExt = (file.name.split('.').pop() || '').toLowerCase()
+    if (!ALLOWED_INVOICE_EXTENSIONS.includes(fileExt)) {
+      return { error: 'El archivo de la factura debe ser PDF o XML' }
+    }
+    if (file.size > MAX_INVOICE_FILE_BYTES) {
+      return { error: 'El archivo de la factura supera el tamaño máximo (10 MB)' }
+    }
+    const safeInvoiceNumber = invoiceNumber.replace(/[^A-Za-z0-9_-]/g, '_')
+    const filePath = `${companyId}/${payerId}/${safeInvoiceNumber}_${Date.now()}.${fileExt}`
 
     const { error: uploadError } = await supabase.storage
       .from('invoices-docs')
@@ -160,13 +168,6 @@ export async function createInvoiceAction(formData: FormData) {
     return { error: 'Debes subir el archivo de la factura (PDF/XML)' }
   }
 
-  // --- BLINDAJE DE PERFIL ---
-  const profileResult = await ensureUserProfile(supabase, user.id)
-  if (!profileResult.success) {
-    return { error: 'Error de integridad: ' + profileResult.error }
-  }
-  // --------------------------
-
   // 4. Guardar Factura
   const { error: insertError } = await supabase
     .from('invoices')
@@ -174,7 +175,7 @@ export async function createInvoiceAction(formData: FormData) {
       invoice_number: invoiceNumber,
       payer_id: payerId,
       client_id: profile.id,
-      company_id: profile.company_id,
+      company_id: companyId,
       amount: numericAmount,
       issue_date: issueDate,
       due_date: dueDate,
@@ -192,6 +193,7 @@ export async function createInvoiceAction(formData: FormData) {
 
   if (insertError) {
     console.error('Error guardando factura:', insertError)
+    await supabase.storage.from('invoices-docs').remove([fileUrl])
     return { error: 'Error guardando la factura en base de datos' }
   }
 
@@ -207,21 +209,23 @@ export async function createInvoiceAction(formData: FormData) {
 }
 
 export async function toggleInvoiceStatus(invoiceId: string, newStatus: string) {
-  const supabase = await createClient()
-  const profile = await getUserProfile(supabase)
-  if (!profile) return { error: 'No autorizado' }
+  const auth = await tenantOrError('superadmin', 'cartera')
+  if ('error' in auth) return { error: 'No tienes permisos para cambiar el estado de facturas' }
+  const { companyId } = auth
 
-  if (profile.role !== 'superadmin' && profile.role !== 'cartera') {
-    return { error: 'No tienes permisos para cambiar el estado de facturas' }
+  if (!INVOICE_STATUSES.includes(newStatus)) {
+    return { error: 'Estado de factura no válido' }
   }
 
-  const { error } = await supabase
+  const supabase = createAdminClient()
+  const { data: updated, error } = await supabase
     .from('invoices')
     .update({ status: newStatus })
     .eq('id', invoiceId)
-    .eq('company_id', profile.company_id)
+    .eq('company_id', companyId)
+    .select('id')
 
-  if (error) {
+  if (error || !updated || updated.length === 0) {
     return { error: 'Error actualizando estado' }
   }
 
@@ -229,20 +233,18 @@ export async function toggleInvoiceStatus(invoiceId: string, newStatus: string) 
   return { success: true }
 }
 
-export async function sendInvoiceEmailAction(invoiceId: string, email: string, subject: string, body: string) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+/**
+ * El destinatario es SIEMPRE el contacto del pagador guardado en BD. El parámetro
+ * `_email` se conserva por compatibilidad con la UI pero no se usa: así nadie puede
+ * usar el dominio de Avalia para enviar correos a direcciones arbitrarias.
+ */
+export async function sendInvoiceEmailAction(invoiceId: string, _email: string, subject: string, body: string) {
+  const auth = await tenantOrError('superadmin', 'cartera')
+  if ('error' in auth) return { error: 'No tienes permisos para enviar correos de facturas' }
+  const { user, companyId } = auth
+  const supabase = createAdminClient()
 
-  if (!user) return { error: 'No autenticado' }
-
-  const profile = await getUserProfile(supabase)
-  if (!profile) return { error: 'No autorizado' }
-
-  if (profile.role !== 'superadmin' && profile.role !== 'cartera') {
-    return { error: 'No tienes permisos para enviar correos de facturas' }
-  }
-
-  // Consultar detalles de la factura para la plantilla
+  // Consultar detalles de la factura (solo de la propia empresa)
   const { data: invoice } = await supabase
     .from('invoices')
     .select(`
@@ -250,14 +252,23 @@ export async function sendInvoiceEmailAction(invoiceId: string, email: string, s
             amount,
             due_date,
             payers (
-                social_reason
+                razon_social,
+                contact_email
             )
         `)
     .eq('id', invoiceId)
+    .eq('company_id', companyId)
     .single()
 
-  const payerData = invoice?.payers as any
-  const payerName = payerData?.social_reason || (Array.isArray(payerData) && payerData[0]?.social_reason) || 'Cliente'
+  if (!invoice) return { error: 'Factura no encontrada' }
+
+  const payerRelation = invoice.payers as unknown
+  const payerData = (Array.isArray(payerRelation) ? payerRelation[0] : payerRelation) as
+    { razon_social?: string; contact_email?: string } | null
+  const recipient = payerData?.contact_email
+  if (!recipient) return { error: 'El pagador no tiene email de contacto configurado.' }
+
+  const payerName = payerData?.razon_social || 'Cliente'
   const invoiceNumber = invoice?.invoice_number || 'N/A'
   const formattedAmount = invoice?.amount
     ? new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(invoice.amount)
@@ -266,8 +277,8 @@ export async function sendInvoiceEmailAction(invoiceId: string, email: string, s
 
   try {
     const result = await sendEmail({
-      to: email,
-      subject: subject,
+      to: recipient,
+      subject: subject.slice(0, 200),
       react: InvoiceEmail({
         invoiceNumber,
         amount: formattedAmount,
@@ -282,7 +293,7 @@ export async function sendInvoiceEmailAction(invoiceId: string, email: string, s
       return { error: 'Error enviando el correo: ' + result.error }
     }
 
-    console.log(`[AUDIT] Email enviado por ${user.email} para factura ${invoiceId} a ${email}`)
+    console.log(`[AUDIT] Email enviado por ${user.email} para factura ${invoiceId} a ${recipient}`)
 
     return { success: true }
 

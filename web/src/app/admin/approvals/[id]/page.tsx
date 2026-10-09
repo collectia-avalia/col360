@@ -5,6 +5,7 @@ import { ArrowLeft, FileText, Download, ShieldCheck, Award, Pencil } from 'lucid
 import DecisionForm from './decision-form'
 import { DigitalCertificate } from '@/components/DigitalCertificate'
 import CreditStudyPanel from './credit-study-panel'
+import { requirePlatformAdminPage } from '@/lib/auth/guards'
 
 export default async function ApprovalDetailPage({ 
   params, 
@@ -13,6 +14,8 @@ export default async function ApprovalDetailPage({
   params: Promise<{ id: string }>,
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>
 }) {
+  await requirePlatformAdminPage()
+
   const { id } = await params
   const sParams = await searchParams
   const isEditing = sParams['edit'] === 'true'

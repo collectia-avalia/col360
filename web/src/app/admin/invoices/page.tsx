@@ -3,6 +3,7 @@ import { FileText, DollarSign, ShieldCheck, TrendingUp, Download } from 'lucide-
 import { KpiCard } from '@/components/dashboard/KpiCard'
 import { InvoiceChart } from '@/components/dashboard/InvoiceChart'
 import { AdminInvoicesTable } from './AdminInvoicesTable'
+import { requirePlatformAdminPage } from '@/lib/auth/guards'
 
 const formatCurrency = (val: number) =>
   new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(val)
@@ -22,6 +23,8 @@ function getDisplayStatus(status: string, diasMora: number, isAnulada?: boolean)
 }
 
 export default async function AdminInvoicesPage() {
+  await requirePlatformAdminPage()
+
   const supabase = createAdminClient()
 
   // Facturas con datos del cliente y del deudor

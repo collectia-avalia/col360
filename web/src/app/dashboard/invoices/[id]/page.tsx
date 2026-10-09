@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { ArrowLeft, FileText, Calendar, DollarSign, MessageSquare, Mail, AlertTriangle, CheckCircle, Clock } from 'lucide-react'
 
 import { EmailButton } from '../EmailButton'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 export default async function InvoiceDetailPage({
   params,
@@ -66,8 +67,10 @@ export default async function InvoiceDetailPage({
     if (invoice.file_url.startsWith('http')) {
         signedFileUrl = invoice.file_url
     } else {
-        // Si es un path relativo de storage, generamos URL firmada
-        const { data } = await supabase.storage
+        // Path de storage: la factura ya se leyó con la sesión del usuario (RLS por
+        // empresa), así que es suya; el bucket no tiene políticas para usuarios y la
+        // URL firmada se genera con service_role.
+        const { data } = await createAdminClient().storage
             .from('invoices-docs')
             .createSignedUrl(invoice.file_url, 3600) // 1 hora
         

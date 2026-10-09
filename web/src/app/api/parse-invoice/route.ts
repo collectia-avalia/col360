@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { requireTenantRole, authzErrorResponse } from '@/lib/auth/guards'
 
 export const runtime = 'nodejs'
 
@@ -36,13 +37,27 @@ function cleanAmount(raw: string): string {
   return cleaned.replace(/,/g, '')
 }
 
+const MAX_PDF_BYTES = 10 * 1024 * 1024
+
 export async function POST(req: NextRequest) {
   try {
-    const formData = await req.formData()
-    const file = formData.get('file') as File | null
+    await requireTenantRole('superadmin', 'cartera')
+  } catch (err) {
+    const res = authzErrorResponse(err)
+    if (res) return res
+    throw err
+  }
 
-    if (!file) {
+  try {
+    const formData = await req.formData()
+    const file = formData.get('file')
+
+    if (!(file instanceof File)) {
       return NextResponse.json({ error: 'Se requiere un archivo' }, { status: 400 })
+    }
+
+    if (file.size > MAX_PDF_BYTES) {
+      return NextResponse.json({ error: 'El archivo supera el tamaño máximo (10 MB)' }, { status: 413 })
     }
 
     const buffer = Buffer.from(await file.arrayBuffer())

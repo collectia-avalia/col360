@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { requirePlatformAdmin, authzErrorResponse } from '@/lib/auth/guards'
 
 const rangeOptions = [
   { key: '7d', days: 7 },
@@ -26,6 +27,14 @@ function getRangeStart(range: RangeKey) {
 }
 
 export async function GET(req: Request) {
+  try {
+    await requirePlatformAdmin()
+  } catch (err) {
+    const res = authzErrorResponse(err)
+    if (res) return res
+    throw err
+  }
+
   const url = new URL(req.url)
   const range = isRangeKey(url.searchParams.get('range')) ? (url.searchParams.get('range') as RangeKey) : '6m'
   const rangeStart = getRangeStart(range)

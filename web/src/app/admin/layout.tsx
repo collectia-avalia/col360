@@ -1,11 +1,14 @@
 import { createClient } from '@/lib/supabase/server'
 import { AdminLayoutWrapper } from '@/components/layouts/AdminLayoutWrapper'
+import { requirePlatformAdminPage } from '@/lib/auth/guards'
 
 export default async function AdminLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
+  await requirePlatformAdminPage()
+
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 

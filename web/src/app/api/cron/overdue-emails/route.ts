@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { sendEmail } from '@/lib/actions/email';
+import { sendEmail } from '@/lib/email/send';
 
 // Importar plantillas de cobro en formato HTML String
 import { 

@@ -18,7 +18,15 @@ export default async function FormularioPage({ params }: Props) {
     // 1. Validar token directamente (sin auth, sin cookies, sin middleware)
     const { data: payer, error } = await supabaseAdmin
         .from('payers')
-        .select('*, solicitor:profiles(full_name)')
+        // Columnas explícitas: este objeto se serializa al navegador (PayerDashboard es
+        // un client component). Nunca incluir OTP, token, cupos ni resultado del estudio.
+        .select(`
+            id, razon_social, contact_email, risk_status, signed_at, signed_ip,
+            business_activity, product_service, monthly_purchase_value, payment_term,
+            legal_representative, commercial_address,
+            annual_sales, total_assets, total_liabilities, net_utility,
+            solicitor:profiles(full_name)
+        `)
         .eq('invitation_token', token)
         .single()
 
@@ -62,8 +70,9 @@ export default async function FormularioPage({ params }: Props) {
     // 2. Obtener documentos ya cargados
     const { data: documents } = await supabaseAdmin
         .from('payer_documents')
-        .select('*')
+        .select('id, doc_type, updated_at')
         .eq('payer_id', payer.id)
+        .neq('doc_type', 'historia_credito')
 
     return (
         <div className="min-h-screen bg-[#f8fafc] flex flex-col font-sans">

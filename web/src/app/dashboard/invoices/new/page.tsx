@@ -1,22 +1,26 @@
 import { createClient } from '@/lib/supabase/server'
+import { getUserProfile } from '@/lib/supabase/profile'
 import NewInvoiceForm from './form'
 
 export default async function NewInvoicePage() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const profile = await getUserProfile(supabase)
+  // Sin empresa no hay pagadores; el uuid nulo no coincide con ninguna fila
+  const companyId = profile?.company_id ?? '00000000-0000-0000-0000-000000000000'
 
-  // Obtener pagadores del usuario para el select
+  // Pagadores de la empresa (no solo los creados por este usuario: cartera
+  // radica facturas de pagadores que creó comercial)
   const { data: payers } = await supabase
     .from('payers')
     .select('id, razon_social, nit')
-    .eq('created_by', user?.id)
+    .eq('company_id', companyId)
     .order('razon_social')
 
-  // Obtener todas las facturas no pagadas del cliente
+  // Todas las facturas no pagadas de la empresa
   const { data: unpaidInvoices } = await supabase
     .from('invoices')
     .select('payer_id, due_date, status, legal_declarations')
-    .eq('client_id', user?.id)
+    .eq('company_id', companyId)
     .neq('status', 'pagada')
 
   const formatter = new Intl.DateTimeFormat('fr-CA', {

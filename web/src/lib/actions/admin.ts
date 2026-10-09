@@ -2,16 +2,24 @@
 
 import { createAdminClient } from '@/lib/supabase/admin'
 import { revalidatePath } from 'next/cache'
-import React from 'react'
-import { sendEmail } from '@/lib/actions/email'
+import { sendEmail } from '@/lib/email/send'
+import { denyUnlessPlatformAdmin } from '@/lib/auth/guards'
 import { PayerWelcomeHtml } from '@/components/emails/htmlTemplates'
 
 // --- GESTIÓN DE CLIENTES ---
 
 export async function deleteClientAction(userId: string) {
+    const denied = await denyUnlessPlatformAdmin()
+    if (denied) return { error: denied.error }
+
     const supabase = createAdminClient()
 
     try {
+        const { data: target } = await supabase.from('profiles').select('role').eq('id', userId).maybeSingle()
+        if (target?.role === 'admin') {
+            return { error: 'No se puede eliminar un usuario administrador de la plataforma desde aquí.' }
+        }
+
         console.log(`[ADMIN] Intentando eliminar cliente: ${userId}`)
         const { error: authError } = await supabase.auth.admin.deleteUser(userId)
 
@@ -40,6 +48,9 @@ export async function deleteClientAction(userId: string) {
 }
 
 export async function updateClientAction(userId: string, formData: FormData) {
+    const denied = await denyUnlessPlatformAdmin()
+    if (denied) return { error: denied.error }
+
     const supabase = createAdminClient()
     const companyName = formData.get('companyName') as string
     const email = formData.get('email') as string
@@ -103,6 +114,9 @@ export async function updateClientAction(userId: string, formData: FormData) {
 // --- GESTIÓN DE APROBACIONES (RIESGO) ---
 
 export async function approvePayerAction(payerId: string, amount: number) {
+    const denied = await denyUnlessPlatformAdmin()
+    if (denied) return { error: denied.error }
+
     const supabase = createAdminClient()
 
     try {
@@ -178,6 +192,9 @@ export async function approvePayerAction(payerId: string, amount: number) {
 }
 
 export async function rejectPayerAction(payerId: string, reason: string) {
+    const denied = await denyUnlessPlatformAdmin()
+    if (denied) return { error: denied.error }
+
     const supabase = createAdminClient()
 
     // Log the reason for audit purposes (even if not stored in DB yet)

@@ -15,21 +15,36 @@ export default function SignupPage() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   
-  // Guardar datos temporales para reenvíos
+  // Guardar datos temporales para reenvíos. La contraseña se queda en memoria del
+  // navegador y solo viaja al servidor en el paso 2 (no se guarda mientras se verifica).
   const [registeredEmail, setRegisteredEmail] = useState('')
   const formRef = useRef<HTMLFormElement>(null)
+  const pendingDataRef = useRef<FormData | null>(null)
+  const passwordRef = useRef('')
 
   // Paso 1: Solicitar OTP de registro
   const handleRequestOtp = async (formData: FormData) => {
     setError(null)
     setSuccessMessage(null)
+
+    const password = (formData.get('password') as string) || ''
+    if (password.length < 6) {
+      setError('La contraseña debe tener al menos 6 caracteres')
+      return
+    }
+
     setIsSubmitting(true)
-    
+
     try {
       const emailVal = formData.get('email') as string
       setRegisteredEmail(emailVal)
 
-      const res = await requestSignupOtpAction(formData)
+      passwordRef.current = password
+      const data = new FormData()
+      formData.forEach((value, key) => { if (key !== 'password') data.append(key, value) })
+      pendingDataRef.current = data
+
+      const res = await requestSignupOtpAction(data)
       if (res?.error) {
         setError(res.error)
       } else {
@@ -60,7 +75,7 @@ export default function SignupPage() {
     }
 
     try {
-      const res = await verifySignupOtpAction(registeredEmail, otpCode)
+      const res = await verifySignupOtpAction(registeredEmail, otpCode, passwordRef.current)
       if (res?.error) {
         setError(res.error)
       } else if (res?.success) {
@@ -76,14 +91,13 @@ export default function SignupPage() {
 
   // Reenviar OTP usando los datos del formulario original
   const handleResendOtp = async () => {
-    if (!formRef.current) return
+    if (!pendingDataRef.current) return
     setError(null)
     setSuccessMessage(null)
     setIsSubmitting(true)
 
     try {
-      const formData = new FormData(formRef.current)
-      const res = await requestSignupOtpAction(formData)
+      const res = await requestSignupOtpAction(pendingDataRef.current)
       if (res?.error) {
         setError(res.error)
       } else {

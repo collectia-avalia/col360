@@ -4,8 +4,8 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { sendEmail } from '@/lib/actions/email'
-import { headers } from 'next/headers'
+import { sendEmail, escapeHtml } from '@/lib/email/send'
+import { generateOtp, hashOtp, verifyOtp, nextSendWindow, OTP_TTL_MS, OTP_MAX_ATTEMPTS } from '@/lib/auth/otp'
 
 
 export async function login(formData: FormData) {
@@ -46,10 +46,8 @@ export async function sendPasswordResetEmail(formData: FormData) {
     return { error: 'El correo electrónico es requerido' }
   }
 
-  const headersList = await headers()
-  const host = headersList.get('host') || 'localhost:3000'
-  const protocol = host.includes('localhost') ? 'http' : 'https'
-  const origin = `${protocol}://${host}`
+  // Origen fijo: el header Host lo controla el cliente
+  const origin = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
 
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
     redirectTo: `${origin}/auth/callback?next=/reset-password`,
@@ -91,63 +89,73 @@ export async function updatePassword(formData: FormData) {
   return { success: true }
 }
 
-export async function requestSignupOtpAction(formData: FormData) {
-  const email = formData.get('email') as string
-  const password = formData.get('password') as string
-  const companyName = formData.get('companyName') as string
-  const nit = formData.get('nit') as string
-  const contactName = formData.get('contactName') as string
-  const phone = formData.get('phone') as string
-  const address = formData.get('address') as string
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
-  if (!email || !password || !companyName || !nit || !contactName || !phone || !address) {
+/**
+ * Paso 1 del registro freemium. La contraseña NO se envía ni se guarda aquí:
+ * el navegador la conserva y la manda en el paso 2 junto con el código.
+ */
+export async function requestSignupOtpAction(formData: FormData) {
+  const field = (name: string) => {
+    const value = formData.get(name)
+    return typeof value === 'string' ? value.trim().slice(0, 200) : ''
+  }
+  const email = field('email').toLowerCase()
+  const companyName = field('companyName')
+  const nit = field('nit')
+  const contactName = field('contactName')
+  const phone = field('phone')
+  const address = field('address')
+
+  if (!email || !companyName || !nit || !contactName || !phone || !address) {
     return { error: 'Todos los campos son requeridos' }
   }
 
-  if (password.length < 6) {
-    return { error: 'La contraseña debe tener al menos 6 caracteres' }
+  if (!EMAIL_RE.test(email)) {
+    return { error: 'Correo electrónico inválido' }
   }
 
   const supabaseAdmin = createAdminClient()
 
   try {
-    // 1. Validar que el correo no esté ya registrado en auth
-    const { data: listUsers, error: listError } = await supabaseAdmin.auth.admin.listUsers()
-    if (listError) {
-      console.error('[SIGNUP_OTP] Error al listar usuarios:', listError.message)
-    }
-    const emailExists = listUsers?.users?.some(u => u.email === email)
-    if (emailExists) {
+    // 1. Validar que el correo no esté ya registrado
+    const { data: existingProfile } = await supabaseAdmin
+      .from('profiles')
+      .select('id')
+      .ilike('email', email)
+      .maybeSingle()
+    if (existingProfile) {
       return { error: 'Este correo electrónico ya está registrado.' }
     }
 
-    // 2. Generar OTP de 6 dígitos
-    const otpCode = Math.floor(100000 + Math.random() * 900000).toString()
-    const expiresAt = new Date(Date.now() + 15 * 60000).toISOString() // 15 minutos
+    // 2. Límite de envíos por correo
+    const { data: current } = await supabaseAdmin
+      .from('signup_otps')
+      .select('sent_count, window_started_at')
+      .eq('email', email)
+      .maybeSingle()
 
-    const signupData = {
-      email,
-      password,
-      companyName,
-      nit,
-      contactName,
-      phone,
-      address
+    const window = nextSendWindow(current)
+    if (!window) {
+      return { error: 'Has solicitado demasiados códigos. Intenta de nuevo en una hora.' }
     }
 
-    // 3. Guardar en la tabla signup_otps (upsert en caso de que reenvíe)
+    // 3. Guardar solo el hash del código y los datos de empresa (sin contraseña)
+    const otpCode = generateOtp()
     const { error: dbError } = await supabaseAdmin
       .from('signup_otps')
       .upsert({
         email,
-        otp_code: otpCode,
-        signup_data: signupData,
-        expires_at: expiresAt
+        otp_code: hashOtp(`signup:${email}`, otpCode),
+        signup_data: { companyName, nit, contactName, phone, address },
+        expires_at: new Date(Date.now() + OTP_TTL_MS).toISOString(),
+        attempts: 0,
+        ...window,
       })
 
     if (dbError) {
-      console.error('[SIGNUP_OTP] Error guardando OTP en base de datos:', dbError.message)
-      return { error: `Error de BD: ${dbError.message} (${dbError.details || 'sin detalles'})` }
+      console.error('[SIGNUP_OTP] Error guardando OTP en base de datos:', dbError)
+      return { error: 'No se pudo iniciar el registro. Intenta de nuevo.' }
     }
 
     // 4. Enviar OTP por correo al usuario
@@ -157,8 +165,8 @@ export async function requestSignupOtpAction(formData: FormData) {
       html: `
         <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 25px; border: 1px solid #e2e8f0; border-radius: 16px; background-color: #ffffff;">
           <h2 style="color: #6366f1; text-align: center; margin-bottom: 20px; font-weight: 800;">Verifica tu Registro en Avalia</h2>
-          <p style="color: #334155; font-size: 15px; line-height: 1.6;">Hola <strong>${contactName}</strong>,</p>
-          <p style="color: #334155; font-size: 15px; line-height: 1.6;">Estás a un paso de registrar a tu empresa <strong>${companyName}</strong> en Avalia.</p>
+          <p style="color: #334155; font-size: 15px; line-height: 1.6;">Hola <strong>${escapeHtml(contactName)}</strong>,</p>
+          <p style="color: #334155; font-size: 15px; line-height: 1.6;">Estás a un paso de registrar a tu empresa <strong>${escapeHtml(companyName)}</strong> en Avalia.</p>
           <p style="color: #334155; font-size: 15px; line-height: 1.6;">Utiliza el siguiente código de verificación de 6 dígitos para completar tu registro:</p>
           <div style="background-color: #f8fafc; padding: 25px; text-align: center; border-radius: 12px; margin: 30px 0; border: 1px solid #f1f5f9;">
             <span style="font-size: 36px; font-weight: 900; letter-spacing: 0.4em; color: #1e293b; font-family: monospace; padding-left: 0.4em;">${otpCode}</span>
@@ -172,53 +180,65 @@ export async function requestSignupOtpAction(formData: FormData) {
 
     if (!emailResult.success) {
       console.error('[SIGNUP_OTP] Error al enviar email:', emailResult.error)
-      // Eliminar registro temporal si falló el correo
-      await supabaseAdmin.from('signup_otps').delete().eq('email', email)
-      return { error: `Error de Correo: ${emailResult.error}` }
+      return { error: 'No se pudo enviar el código a tu correo. Verifica la dirección e intenta de nuevo.' }
     }
-
-    console.log(`[SIGNUP_OTP_DEBUG] OTP enviado exitosamente para ${email}: ${otpCode}`)
-  } catch (err: any) {
-    console.error('[SIGNUP_OTP] Excepción crítica en registro OTP:', err.message || err)
-    return { error: `Excepción de Servidor: ${err.message || 'Error desconocido'}` }
+  } catch (err: unknown) {
+    console.error('[SIGNUP_OTP] Excepción crítica en registro OTP:', err)
+    return { error: 'Error inesperado al iniciar el registro.' }
   }
 
   return { success: true }
 }
 
-export async function verifySignupOtpAction(email: string, otpCode: string) {
+/** Paso 2: valida el código y crea la cuenta con la contraseña que envía el navegador. */
+export async function verifySignupOtpAction(rawEmail: string, otpCode: string, password: string) {
+  const email = typeof rawEmail === 'string' ? rawEmail.trim().toLowerCase() : ''
   if (!email || !otpCode) {
     return { error: 'Faltan datos de verificación' }
+  }
+
+  if (typeof password !== 'string' || password.length < 6) {
+    return { error: 'La contraseña debe tener al menos 6 caracteres' }
   }
 
   const supabaseAdmin = createAdminClient()
 
   // 1. Consultar el OTP y los datos en signup_otps
-  const { data: record, error: dbError } = await supabaseAdmin
+  const { data: record } = await supabaseAdmin
     .from('signup_otps')
-    .select('*')
+    .select('otp_code, signup_data, expires_at, attempts')
     .eq('email', email)
-    .single()
+    .maybeSingle()
 
-  if (dbError || !record) {
+  if (!record) {
     return { error: 'Código de verificación no válido o expirado.' }
   }
 
-  if (record.otp_code !== otpCode) {
-    return { error: 'El código ingresado es incorrecto.' }
+  if (record.attempts >= OTP_MAX_ATTEMPTS) {
+    return { error: 'Demasiados intentos. Solicita un nuevo código.' }
   }
 
   if (new Date(record.expires_at) < new Date()) {
     return { error: 'El código de verificación ha expirado. Solicita uno nuevo.' }
   }
 
-  const signupData = record.signup_data
+  if (!verifyOtp(`signup:${email}`, otpCode, record.otp_code)) {
+    await supabaseAdmin
+      .from('signup_otps')
+      .update({ attempts: record.attempts + 1 })
+      .eq('email', email)
+    return { error: 'El código ingresado es incorrecto.' }
+  }
+
+  const signupData = record.signup_data as {
+    companyName: string; nit: string; contactName: string; phone: string; address: string
+  }
 
   try {
-    // 2. Crear el usuario en Supabase Auth de forma pre-confirmada (email_confirm: true)
+    // 2. Crear el usuario pre-confirmado. El rol va en app_metadata (no editable por el usuario).
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-      email: signupData.email,
-      password: signupData.password,
+      email,
+      password,
       email_confirm: true,
       user_metadata: {
         company_name: signupData.companyName,
@@ -226,38 +246,51 @@ export async function verifySignupOtpAction(email: string, otpCode: string) {
         contact_name: signupData.contactName,
         phone: signupData.phone,
         address: signupData.address,
-        role: 'client' // Rol correcto del enum de Supabase
-      }
+      },
+      app_metadata: { role: 'client' },
     })
 
     if (authError || !authData.user) {
-      console.error('[SIGNUP_OTP] Error creando usuario en Supabase Auth:', authError?.message)
-      return { error: `Error de registro: ${authError?.message || 'No se pudo crear el usuario'}` }
+      console.error('[SIGNUP_OTP] Error creando usuario en Supabase Auth:', authError)
+      return { error: 'No se pudo crear la cuenta. Si ya estás registrado, inicia sesión.' }
     }
 
-    // 3. Eliminar el OTP temporal para no dejar registros basura
+    // 3. Perfil explícito (no depende de la versión del trigger)
+    const { error: profileError } = await supabaseAdmin
+      .from('profiles')
+      .upsert({
+        id: authData.user.id,
+        email,
+        company_name: signupData.companyName,
+        nit: signupData.nit,
+        full_name: signupData.contactName,
+        role: 'client',
+      }, { onConflict: 'id' })
+
+    if (profileError) {
+      console.error('[SIGNUP_OTP] Error creando perfil:', profileError)
+      await supabaseAdmin.auth.admin.deleteUser(authData.user.id)
+      return { error: 'No se pudo crear la cuenta. Intenta de nuevo.' }
+    }
+
+    // 4. Eliminar el OTP temporal
     await supabaseAdmin
       .from('signup_otps')
       .delete()
       .eq('email', email)
 
-    // 4. Iniciar sesión automáticamente en el servidor
+    // 5. Iniciar sesión automáticamente en el servidor
     const supabase = await createClient()
-    const { error: signInError } = await supabase.auth.signInWithPassword({
-      email: signupData.email,
-      password: signupData.password
-    })
+    const { error: signInError } = await supabase.auth.signInWithPassword({ email, password })
 
     if (signInError) {
       console.error('[SIGNUP_OTP] Error al loguear usuario automáticamente:', signInError.message)
-      // Redirigir a login para ingreso manual si falla el autologin
       return { success: true, redirect: '/login?signup=success' }
     }
 
     return { success: true, redirect: '/dashboard' }
-  } catch (err: any) {
-    console.error('[SIGNUP_OTP] Error en verificación de OTP:', err.message || err)
+  } catch (err: unknown) {
+    console.error('[SIGNUP_OTP] Error en verificación de OTP:', err)
     return { error: 'Error inesperado durante la verificación del registro.' }
   }
 }
-

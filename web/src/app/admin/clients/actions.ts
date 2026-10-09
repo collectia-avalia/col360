@@ -4,7 +4,8 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { z } from 'zod'
-import { sendEmail } from '@/lib/actions/email'
+import { denyUnlessPlatformAdmin } from '@/lib/auth/guards'
+import { sendEmail } from '@/lib/email/send'
 import WelcomeClientEmail from '@/components/emails/WelcomeClientEmail'
 import React from 'react'
 
@@ -19,6 +20,9 @@ const createClientSchema = z.object({
 })
 
 export async function createClientAction(formData: FormData) {
+  const denied = await denyUnlessPlatformAdmin()
+  if (denied) return { error: { root: [denied.error] } }
+
   const adminSupabase = createAdminClient()
 
   const rawData = {
@@ -54,7 +58,8 @@ export async function createClientAction(formData: FormData) {
     return { error: { root: ['Error creando la empresa: ' + companyError?.message] } }
   }
 
-  // 1. Crear usuario en Auth
+  // 1. Crear usuario en Auth. Rol y compañía van en app_metadata (solo service_role
+  //    puede escribirlo); user_metadata es editable por el propio usuario.
   const { data: user, error: authError } = await adminSupabase.auth.admin.createUser({
     email,
     password,
@@ -62,12 +67,11 @@ export async function createClientAction(formData: FormData) {
     user_metadata: {
       company_name: companyName,
       nit: nit,
-      total_bag: totalBag,
-      max_exposure: maxExposure,
-      credit_study_fee: creditStudyFee,
-      role: 'superadmin', // El primer usuario es siempre superadmin
-      company_id: company.id
-    }
+    },
+    app_metadata: {
+      role: 'superadmin', // El primer usuario de la empresa es su superadmin
+      company_id: company.id,
+    },
   })
 
   if (authError) {
@@ -78,46 +82,25 @@ export async function createClientAction(formData: FormData) {
     return { error: { root: ['Error inesperado al crear usuario'] } }
   }
 
-  // 2. Verificar si el perfil se creó automáticamente (vía trigger)
-  // Agregamos un pequeño reintento o verificación directa para evitar fallos silenciosos
-  const { data: profile } = await adminSupabase
+  // 2. Perfil explícito: no depende de la versión del trigger handle_new_user
+  const { error: profileError } = await adminSupabase
     .from('profiles')
-    .select('id')
-    .eq('id', user.user.id)
-    .single()
+    .upsert({
+      id: user.user.id,
+      email: email,
+      company_name: companyName,
+      role: 'superadmin',
+      nit: nit,
+      total_bag: totalBag,
+      max_exposure: maxExposure,
+      credit_study_fee: creditStudyFee,
+      company_id: company.id
+    }, { onConflict: 'id' })
 
-  if (!profile) {
-    console.log(`[AUDIT] Trigger falló para ${email}. Creando perfil manualmente...`)
-    const { error: profileError } = await adminSupabase
-      .from('profiles')
-      .insert({
-        id: user.user.id,
-        email: email,
-        company_name: companyName,
-        role: 'superadmin',
-        nit: nit,
-        total_bag: totalBag,
-        max_exposure: maxExposure,
-        credit_study_fee: creditStudyFee,
-        company_id: company.id
-      })
-
-    if (profileError) {
-      console.error('Error crítico: No se pudo crear ni el perfil manual:', profileError)
-      // Opcional: Podríamos borrar el usuario de Auth aquí, pero es mejor dejarlo para debugging
-    }
-  } else {
-    // Si el perfil existe pero queremos asegurar que campos como NIT o bolsa estén actualizados
-    // (por si el trigger es una versión antigua que no los incluía)
-    await adminSupabase
-      .from('profiles')
-      .update({
-        nit: nit,
-        total_bag: totalBag,
-        max_exposure: maxExposure,
-        credit_study_fee: creditStudyFee
-      })
-      .eq('id', user.user.id)
+  if (profileError) {
+    console.error('Error crítico creando el perfil del cliente:', profileError)
+    await adminSupabase.auth.admin.deleteUser(user.user.id)
+    return { error: { root: ['No se pudo crear el perfil del cliente.'] } }
   }
 
   // 3. Enviar Correo de Bienvenida con Credenciales

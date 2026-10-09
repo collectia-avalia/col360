@@ -1,7 +1,10 @@
 import { createClient } from '@/lib/supabase/server'
 import { ProfileForm } from '@/components/ui/ProfileForm'
+import { requirePlatformAdminPage } from '@/lib/auth/guards'
 
 export default async function AdminProfilePage() {
+  await requirePlatformAdminPage()
+
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   

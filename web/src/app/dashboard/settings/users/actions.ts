@@ -1,8 +1,7 @@
 'use server'
 
 import { createAdminClient } from '@/lib/supabase/admin'
-import { getUserProfile } from '@/lib/supabase/profile'
-import { createClient } from '@/lib/supabase/server'
+import { tenantOrError } from '@/lib/auth/guards'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 
@@ -14,15 +13,12 @@ const createUserSchema = z.object({
 })
 
 export async function createCompanyUserAction(formData: FormData) {
-  const supabase = await createClient()
+  // 1. Solo el Superadmin de una empresa gestiona su equipo
+  const auth = await tenantOrError('superadmin')
+  if ('error' in auth) return { error: 'No autorizado. Solo el Superadmin de la empresa puede gestionar usuarios.' }
+  const { companyId, profile } = auth
+
   const adminSupabase = createAdminClient()
-  
-  // 1. Verificar que quien invita sea Superadmin de su empresa
-  const currentUserProfile = await getUserProfile(supabase)
-  
-  if (!currentUserProfile || currentUserProfile.role !== 'superadmin') {
-    return { error: 'No autorizado. Solo el Superadmin de la empresa puede gestionar usuarios.' }
-  }
 
   const rawData = {
     email: formData.get('email'),
@@ -38,17 +34,26 @@ export async function createCompanyUserAction(formData: FormData) {
 
   const { email, password, fullName, role } = validation.data
 
-  // 2. Crear usuario en Auth con el company_id del que invita
+  const { data: company } = await adminSupabase
+    .from('companies')
+    .select('name')
+    .eq('id', companyId)
+    .maybeSingle()
+  const companyName = company?.name || profile.company_name
+
+  // 2. Crear usuario en Auth. Rol y compañía en app_metadata (no editable por el usuario).
   const { data: newUser, error: authError } = await adminSupabase.auth.admin.createUser({
     email,
     password,
     email_confirm: true,
     user_metadata: {
       full_name: fullName,
-      company_id: currentUserProfile.company_id,
-      company_name: currentUserProfile.companies?.name || currentUserProfile.company_name,
-      role: role
-    }
+      company_name: companyName,
+    },
+    app_metadata: {
+      role,
+      company_id: companyId,
+    },
   })
 
   if (authError) {
@@ -56,24 +61,22 @@ export async function createCompanyUserAction(formData: FormData) {
     return { error: 'Error al crear usuario: ' + authError.message }
   }
 
-  // 3. Crear Perfil (El trigger debería hacerlo, pero aseguramos para el nuevo esquema)
+  // 3. Perfil explícito (upsert): no depende de la versión del trigger handle_new_user
   const { error: profileError } = await adminSupabase
     .from('profiles')
-    .insert({
+    .upsert({
       id: newUser.user.id,
       email: email,
       full_name: fullName,
-      company_id: currentUserProfile.company_id,
+      company_id: companyId,
       role: role,
-      company_name: currentUserProfile.companies?.name || currentUserProfile.company_name
-    })
+      company_name: companyName
+    }, { onConflict: 'id' })
 
   if (profileError) {
     console.error('Error Profile:', profileError)
-    // No fallamos si el trigger ya lo hizo (error de duplicado), pero si es otro error sí
-    if (!profileError.message.includes('duplicate key')) {
-        return { error: 'Error al crear perfil: ' + profileError.message }
-    }
+    await adminSupabase.auth.admin.deleteUser(newUser.user.id)
+    return { error: 'Error al crear el perfil del usuario.' }
   }
 
   revalidatePath('/dashboard/settings/users')
@@ -81,32 +84,30 @@ export async function createCompanyUserAction(formData: FormData) {
 }
 
 export async function deleteCompanyUserAction(userId: string) {
-    const supabase = await createClient()
-    const adminSupabase = createAdminClient()
-    
-    const currentUserProfile = await getUserProfile(supabase)
-    if (!currentUserProfile || currentUserProfile.role !== 'superadmin') {
-      return { error: 'No autorizado' }
-    }
+    const auth = await tenantOrError('superadmin')
+    if ('error' in auth) return { error: 'No autorizado' }
+    const { companyId, profile } = auth
 
     // No permitirse borrar a sí mismo
-    if (userId === currentUserProfile.id) {
+    if (userId === profile.id) {
         return { error: 'No puedes eliminarte a ti mismo' }
     }
+
+    const adminSupabase = createAdminClient()
 
     // Verificar que el usuario a borrar pertenezca a la misma empresa
     const { data: targetUser } = await adminSupabase
         .from('profiles')
-        .select('company_id')
+        .select('company_id, role')
         .eq('id', userId)
-        .single()
+        .maybeSingle()
 
-    if (!targetUser || targetUser.company_id !== currentUserProfile.company_id) {
+    if (!targetUser || targetUser.company_id !== companyId || targetUser.role === 'admin') {
         return { error: 'Usuario no pertenece a tu empresa' }
     }
 
     const { error: deleteError } = await adminSupabase.auth.admin.deleteUser(userId)
-    
+
     if (deleteError) {
         return { error: 'Error al eliminar usuario: ' + deleteError.message }
     }

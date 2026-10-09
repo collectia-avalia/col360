@@ -1,5 +1,34 @@
 import crypto from 'crypto';
 
+/** Precios en centavos de COP. Fuente única para el checkout y para validar el webhook. */
+export const WOMPI_PRICES_IN_CENTS = {
+  study: 4500000,           // $45.000 estudio de crédito on-demand
+  monthly: 3990000,         // $39.900 suscripción mensual
+  annual: 39900000,         // $399.000 suscripción anual
+} as const;
+
+const UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
+
+export type WompiReference =
+  | { kind: 'study'; payerId: string }
+  | { kind: 'subscription'; profileId: string; plan: 'monthly' | 'annual' };
+
+/**
+ * Interpreta las referencias `study-<uuid>-<ts>` y `sub-<uuid>-<plan>-<ts>`.
+ * El UUID contiene guiones, así que no se puede usar split('-').
+ */
+export function parseWompiReference(reference: unknown): WompiReference | null {
+  if (typeof reference !== 'string') return null;
+
+  const study = reference.match(new RegExp(`^study-(${UUID})-\\d+$`, 'i'));
+  if (study) return { kind: 'study', payerId: study[1] };
+
+  const sub = reference.match(new RegExp(`^sub-(${UUID})-(monthly|annual)-\\d+$`, 'i'));
+  if (sub) return { kind: 'subscription', profileId: sub[1], plan: sub[2] as 'monthly' | 'annual' };
+
+  return null;
+}
+
 /**
  * Genera la firma de integridad requerida para el Web Checkout de Wompi.
  * Fórmula: SHA-256(referencia + monto_en_centavos + moneda + secreto_integridad)
@@ -63,8 +92,13 @@ export function validateWebhookSignature(
   const eventSecret = process.env.WOMPI_EVENTS_SECRET;
 
   if (!eventSecret) {
-    console.warn('[WOMPI_WARN] WOMPI_EVENTS_SECRET no configurada. Saltando verificación criptográfica para pruebas.');
-    return true; // Bypass defensivo en desarrollo si no hay llaves configuradas
+    // Falla cerrado: sin secreto no se puede distinguir un evento real de uno falsificado.
+    console.error('[WOMPI_ERROR] WOMPI_EVENTS_SECRET no configurada. Webhook rechazado.');
+    return false;
+  }
+
+  if (typeof receivedChecksum !== 'string' || !/^[0-9a-f]{64}$/i.test(receivedChecksum)) {
+    return false;
   }
 
   try {

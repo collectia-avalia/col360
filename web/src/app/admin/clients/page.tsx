@@ -2,8 +2,11 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import Link from 'next/link'
 import { Plus, CheckCircle } from 'lucide-react'
 import { ClientActions } from './client-actions'
+import { requirePlatformAdminPage } from '@/lib/auth/guards'
 
 export default async function ClientsPage() {
+  await requirePlatformAdminPage()
+
   const supabase = createAdminClient()
 
   // DIAGNÓSTICO: Consulta filtrada correctamente

@@ -5,6 +5,7 @@ import { InvoiceChart } from '@/components/dashboard/InvoiceChart'
 import { CreditStudyReport } from '@/components/dashboard/CreditStudyReport'
 import Link from 'next/link'
 import { AdminSystemStatus } from './system-status'
+import { requirePlatformAdminPage } from '@/lib/auth/guards'
 
 const rangeOptions = [
   { key: '7d', label: '7 días', days: 7 },
@@ -49,6 +50,8 @@ export default async function AdminDashboard({
 }: {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>
 }) {
+  await requirePlatformAdminPage()
+
   const params = await searchParams
   const selectedRange: RangeKey = isRangeKey(params.range) ? params.range : '6m'
   const supabase = createAdminClient()
