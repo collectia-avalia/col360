@@ -21,6 +21,8 @@ USING (
 -- Asumimos que el bucket 'invoices-docs' ya existe.
 -- Estructura sugerida: invoices-docs/{client_id}/{filename}
 
+-- (ya creada en init_schema; sin el DROP, `supabase db reset` falla)
+drop policy if exists "Clients can upload invoices" on storage.objects;
 create policy "Clients can upload invoices"
 on storage.objects for insert
 with check (
